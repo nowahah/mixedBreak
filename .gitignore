@@ -1,3 +1,6 @@
+# Original data files should not be exported
+source 
+
 # History files
 .Rhistory
 .Rapp.history
