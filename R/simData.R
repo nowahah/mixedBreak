@@ -98,10 +98,10 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
   # !!! Only for 101 model
   sim.dataset <- sim.dataset %>%
     mutate(
-      peak = pmin(10, b.onset * (break.1 / 20)),
+      plateau = pmin(10, b.onset * (break.1 / 20)),
       # compute "true perfect" trajectory (101 pattern)
       truth.101 = if_else(time < break.1, b.onset * (time / 20),
-                          if_else(time < break.2, peak, peak + b.return * (time - break.2) / 20)
+                          if_else(time < break.2, plateau, plateau + b.return * (time - break.2) / 20)
       ),
       noised.101 = pmin(10, pmax(0, truth.101 + rnorm(n(), sd = score.sd))),
       # truncated end of trajectory
@@ -121,7 +121,7 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
     )
   
   
-  ## Adding missing values
+  ## Adding missing values (Missing Completely At Random)
   sim.dataset <- sim.dataset %>%
     mutate(na.value = if_else(is.na(score), NA, rbinom(n(), 1, na.prob)==1),
            score = if_else(na.value, NA, score)
@@ -133,15 +133,3 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
   return(sim.dataset)
 }
 
-
-print.trajData <- function(x, default = FALSE){
-  if(default){
-    print.data.frame(x)
-  }else{
-    print("My beautiful function")
-  }
-}
-
-subset.trajData <- function(x, observed = TRUE){
-  
-}
