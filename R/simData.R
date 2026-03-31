@@ -40,6 +40,9 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
   ## check entries of the function
   # TODO
   
+  ## normalize parametrization of trajectories
+  # TODO
+  
   
   
   ## simulate breakpoints value
@@ -100,6 +103,7 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
     mutate(
       plateau = pmin(10, b.onset * (break.1 / 20)),
       # compute "true perfect" trajectory (101 pattern)
+      # TODO rewrite with a case_when
       truth.101 = if_else(time < break.1, b.onset * (time / 20),
                           if_else(time < break.2, plateau, plateau + b.return * (time - break.2) / 20)
       ),
@@ -112,11 +116,12 @@ simData <- function(n.obs, breakpoints, b.onset, b.return, score.sd,
   
   
   ## Adding outliers - patient went to the bathroom
-  # TODO not optimal: should be one max per patient ? yes
-  sim.dataset <- sim.dataset %>%
-    mutate(outliers = if_else(rbinom(n(), 1, outlier.prob)==1, T, F),
-           # outliers is a uniform drop in truth of 1-3 points (still bounded 0<=score<=10)
-           score = if_else(outliers, pmin(10, pmax(0, score - sample(1:3, n(), T))), score),
+  # Can happen at most once per patient
+  sim.dataset <- sim.dataset |>
+    group_by(ID) |>
+    mutate(outliers = (row_number()==sample.int(n(), 1))*rbinom(n(), 1, outlier.prob)==1, # outliers location and draft
+           # outliers is a drop in truth of 1-3 points (still bounded 0<=score<=10)
+           score = pmin(10, pmax(0, score - sample(1:3, 1, prob = c(1,4,4))*outliers)),
            outliers = if_else(is.na(score), NA, outliers)
     )
   

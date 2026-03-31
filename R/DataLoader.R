@@ -1,6 +1,12 @@
 library(data.table)
 library(readxl)
 
+
+source("R/print.R")
+source("R/plot.R")
+source("R/subset.R")
+
+
 ## ** load Basel dataset
 dtW <- as.data.table(read_excel("/indirect/student/noahdegoulange/lmbreak/source/SDI_Psilo_22.11.2023.xlsx"))
 basel <- melt(dtW, id.vars = c("Study","PatientID"), variable.name = "time", value.name = "score")

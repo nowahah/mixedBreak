@@ -1,9 +1,6 @@
 ### simData-test.R ----
 
 source("R/DataLoader.R")
-source("R/print.R")
-source("R/plot.R")
-source("R/subset.R")
 
 source("R/simData.R")
 
@@ -22,7 +19,7 @@ time.reg <- list("value" = 20, "sd" = 0) # default regular "perfect" measurement
 time.noise <- list("value" = 20, "sd" = 2) # regular "perfect" measurement strategy with noise
 time.spec <- list("value" = c(0,10,20,30,40,60,120), "sd" = 1)   # specific measurement strategy
 
-outlier.prob <- 0.05
+outlier.prob <- 1/5
 na.prob <- 0.10
 n.trail <- 0L
 
@@ -34,8 +31,8 @@ sim.dataset <- simData(n.obs, breakpoints, b.onset, b.return, score.sd,
 plot(sim.dataset)  # default trajectory plot
 print(sim.dataset) # data generation model
 
-print(sim.dataset, default = T) # default method for data.frame
+# print(sim.dataset, default = T) # default method for data.frame
 print(sim.dataset, n.line = 10L, dgm = F) # dataset of observations
-sim.measurements <- subset(sim.dataset)
+(sim.measurements <- subset(sim.dataset))
 
 # Higher variance during plateau (especially if peak <≈ 10) -> not realistic (need lower variance during plateau)
