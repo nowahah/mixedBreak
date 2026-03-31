@@ -1,7 +1,11 @@
 ### simData.R ---
 ## * simData (documentation)
 ##' @title Simulate SDI trajectories with known truth and noise
-##' @description Simulates trajectories of SDI in patients after psilocybin intake
+##' @description Simulates trajectories of SDI in patients after psilocybin intake.
+##' The simulated trajectories have 3 separate linear phases: onset, peak/plateau,
+##' return to normal consciousness. There are many different parametric representations of such
+##' trajectories. In case it is over specified, *the first parameters will prevail*.
+##' The SDI scale is an integer subjective scale ranging from 0-10.
 ##'
 ##' @param n.obs [integer >= 1] number of observations to simulate in the dataset.
 ##' @param score.sd [numeric>0] noise level (sd) on the measurement.
@@ -11,6 +15,18 @@
 ##' for regular strategies.
 ##' Can be a vector with values of time measurements to specify other irregular strategies.
 ##'
+##' @param plateau [named list] named list with \itemize{
+##' \item "value" for the height / altitude of the plateau (e.g. its 'y' coordinate).
+##' \item "value.sd" for the noise level of height of plateau.
+##' It is *highly recommended* to specify plateau's height given its constraint (\leq 10),
+##' to avoid any unintended re-computation of \code{b.onset} or \code{break.1}. 
+##' They would then not match the pre-specified distribution for those parameters.
+##' \item "duration" for the duration of the plateau on the same time scale as \code{times}.
+##' If \code{plateau$duration==0}, then it is assumed that there is no plateau, and the 
+##' second breakpoint value is ignored if provided.
+##' \item "duration.sd" for the noise level of duration of plateau (on the same time scale 
+##' as \code{times}).
+##' }
 ##' @param b.onset [named list] named list with \itemize{
 ##' \item "value" for coefficient value,
 ##' \item "sd" for the noise level,
@@ -21,14 +37,16 @@
 ##' \item "sd" for the noise level,
 ##' \item "max" for maximum value simulated.
 ##' }
-##' @param plateau [named list] named list with \itemize{
-##' \item "value" for the height / altitude of the plateau (e.g. its 'y' coordinate),
-##' \item "duration" for the duration of the plateau on the same time scale as \code{times}.
-##' }
 ##' @param breakpoints [data.frame] data.frame with \itemize{
-##' \item first column containing breakpoints values
-##' (should be between 0 and the end of the trajectory)
-##' \item and second column with noise parameter for each breakpoint.
+##' \item "bp" first column containing the two breakpoints (sorted,
+##' should be between 0 and the end of the trajectory)
+##' \item "bp.sd" second column with noise parameter for each breakpoint.
+##' }
+##' @param ending.times [named list] named list with \itemize{
+##' \item "value" for average ending time of effects on the patients
+##' \item "sd" for the noise level of parameter
+##' \item "max" for maximum value simulated.
+##' }
 ##'
 ##' @param na.prob [0<numeric<1] proportion of missing at random values in the dataset.
 ##' @param outlier.prob [0<numeric<1] proportion of outlier in the dataset.
@@ -42,7 +60,9 @@
 
 
 simData <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
-                    b.onset = NULL, b.return = NULL, plateau = NULL,
+                    plateau = list("value" = 9, "value.sd" = 3,
+                                   "duration" = 82.4, "duration.sd" = 33.1), 
+                    b.onset = NULL, b.return = NULL, 
                     breakpoints = NULL, ending.times = NULL,
                     outlier.prob = 0, na.prob = 0, n.trail = 0L) {
   require(dplyr)
