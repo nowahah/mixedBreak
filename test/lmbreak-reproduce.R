@@ -1,0 +1,59 @@
+## Reproduce the analysis made from Stenbæck et al. 2020 article
+# From lmbreak github page: https://github.com/bozenne/lmbreak/tree/main
+
+library(lmbreak)
+
+
+data(SDIpsilo, package = "lmbreak")
+SDIpsilo <- SDIpsilo[SDIpsilo$type %in% c("noise","trailing") == FALSE,]
+str(SDIpsilo)
+
+
+## Single pattern, Single dataset
+SDIpsilo13 <- SDIpsilo[SDIpsilo$id==13,]
+
+e.XP111 <- lmbreak(score ~ 0 + bp(time, "111"), data = SDIpsilo13)
+e.XP101 <- lmbreak(score ~ 0 + bp(time, "101"), data = SDIpsilo13)
+e.XP11 <- lmbreak(score ~ 0 + bp(time, "11"), data = SDIpsilo13)
+
+plot(e.XP111, ylim = c(0,12)) ## left panel
+plot(e.XP101, ylim = c(0,12)) ## middle panel
+plot(e.XP11, ylim = c(0,12)) ## right panel
+
+model.tables(e.XP101)
+
+coef(e.XP101, type = "auc", interval = c(0,300))
+
+fit.XP101 <- predict(e.XP101, newdata = data.frame(time = seq(0,440,by=1)))
+cbind(head(fit.XP101), "",tail(fit.XP101))
+
+e.XP01 <- lmbreak(score ~ 0 + bp(time, "01"), data = SDIpsilo13)
+
+
+## Multiple patterns
+e.XPrescue <- lmbreak(score ~ 0 + bp(time, c("01","11")), data = SDIpsilo13)
+coef(e.XPrescue,c("pattern","breakpoint"))
+
+
+## Multiple datasets
+e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
+                    trace = FALSE)
+# That is where I will be working from
+summary(e.XPall)
+model.tables(e.XPall, format = "array", cluster = 11)
+plot(e.XPall, cluster=11)
+
+# what do I want to extract for every individual ?
+# - 2 slopes coefficients
+# - duration of plateau
+# - (breakpoints)
+# Then asses visually linear correlation with 3 2D plots or one 3D plot
+
+
+
+
+
+
+
+
+

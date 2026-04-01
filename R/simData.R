@@ -26,6 +26,8 @@
 ##' second breakpoint value is ignored if provided.
 ##' \item "duration.sd" for the noise level of duration of plateau (on the same time scale 
 ##' as \code{times}).
+##' \item "duration.min" Minimum duration of simulated plateau, if any (always >= 0)
+##' \item "duration.max" Maximum duration of simulated plateau, if any
 ##' }
 ##' @param b.onset [named list] named list with \itemize{
 ##' \item "value" for coefficient value,
@@ -72,6 +74,8 @@ simData <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
 
   ## normalize parametrization of trajectories
   # TODO
+  stopifnot("value" %in% names(plateau), "Plateau duration is mandatory to parametrize trajectories")
+  stopifnot(!is.null(b.onset) | NA, "b.onset or break.1 is mandatory to parametrize the curve")
 
 
   ## simulate breakpoints value

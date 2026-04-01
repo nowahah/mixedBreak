@@ -1,19 +1,20 @@
-### simData-test.R ----
+### simData10-test.R ----
 
 source("R/DataLoader.R")
 
-source("R/simData.R")
+source("R/simData10.R")
 
 library(ggplot2)
 
-n.obs <- 4L
+n.obs <- 6L # nb of patients
 breakpoints <- data.frame(
-  bp = c(90, 180),
-  bp.sd = c(10, 10)
+  pattern = c(1, 0, 1, 0, NA),
+  bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
+  bp.y = c(0, 9.5, 9.5, 2, 2),   # height of breakpoints
+  bp.x.sd = c(0, 100, 100, 100, 100),  # noise levels
+  bp.y.sd = c(0, 1, 0, 1, 0)
 )
-b.onset <- list("value" = 2 * 1.4, "sd" = 2 * 0.5, "min" = 0.5) # onset coefficient per 20 min
-b.return <- list("value" = 2 * -0.7, "sd" = 2 * 0.3, "max" = -0.2) # return to normal coefficient per 20 min
-score.sd <- 1 # noise level on the measurements
+
 # different time specifications
 time.reg <- list("value" = 20, "sd" = 0) # default regular "perfect" measurement strategy
 time.noise <- list("value" = 20, "sd" = 2) # regular "perfect" measurement strategy with noise
@@ -24,16 +25,18 @@ na.prob <- 1 / 10 # measurement probability to be missing
 n.trail <- 0L # nb of trailing observations
 
 
-sim.dataset <- simData(
+sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  b.onset = b.onset,
-  b.return = b.return,
-  plateau = NULL,
   breakpoints = breakpoints,
-  ending.times = NULL,
-  outlier.prob = outlier.prob, na.prob = na.prob,
+  outlier.prob = outlier.prob,
+  na.prob = na.prob,
   n.trail = n.trail
 )
+
+sim.dataset <- sim.data$sim.dataset
+sim.gen.model <- sim.data$sim.gen.model
+
+# TODO - need to rewrite plot, print, etc. according to new data structure
 plot(sim.dataset) # default trajectory plot
 print(sim.dataset) # data generation model
 
