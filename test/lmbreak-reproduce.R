@@ -40,20 +40,33 @@ e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo
                     trace = FALSE)
 # That is where I will be working from
 summary(e.XPall)
-(tbl <- model.tables(e.XPall, format = "array", cluster = 11)[,,1])
+tbl <- model.tables(e.XPall)
 # plot(e.XPall, cluster=11)
 
-# what do I want to extract for every individual ?
-# - 2 slopes coefficients
-# - duration of plateau
-# - (breakpoints)
-# Then asses visually linear correlation with 3 2D plots or one 3D plot
+n.obs <- 15L
+breakpoints <- tbl[rep((1:15-1)*4,each=2)+2:3, 2]
+breakpoints <- matrix(breakpoints, ncol = 2, byrow = T) # breakpoints
+b.onset <- tbl[(1:15-1)*4+1, 5] # onset slopes
+b.return <- tbl[(1:15-1)*4+3, 5] # return to normal slopes
+peak.duration <- tbl[(1:15-1)*4+3, 2] # duration of plateau
 
+library(rgl)
+plot3d(x=b.onset, y=b.return, z=peak.duration,
+       type="s", radius = 3,
+       rgl.printRglwidget = TRUE)
+rglwidget()
 
+# 1 - onset VS return
+plot(b.onset, b.return)
+cor.test(b.onset, b.return) # non significant correlation
+# 2 - onset VS plateau duration
+plot(b.onset, peak.duration)
+cor.test(b.onset, peak.duration) # significant correlation
+# 3 - return VS plateau duration
+plot(peak.duration, b.return)
+cor.test(b.return, peak.duration) # significant correlation
 
-
-
-
-
-
-
+library(corrplot)
+corrplot(cor(data.frame(b.onset, peak.duration, b.return)), 
+         type = "upper", diag = F, method = "ellipse", 
+         col = rev(COL2('RdBu', 200)))
