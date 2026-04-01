@@ -29,10 +29,10 @@ cbind(head(fit.XP101), "",tail(fit.XP101))
 
 e.XP01 <- lmbreak(score ~ 0 + bp(time, "01"), data = SDIpsilo13)
 
-
 ## Multiple patterns
 e.XPrescue <- lmbreak(score ~ 0 + bp(time, c("01","11")), data = SDIpsilo13)
 coef(e.XPrescue,c("pattern","breakpoint"))
+rm(e.XPrescue, e.XP01, e.XP101, e.XP11, e.XP111, fit.XP101, SDIpsilo13)
 
 
 ## Multiple datasets
@@ -40,8 +40,8 @@ e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo
                     trace = FALSE)
 # That is where I will be working from
 summary(e.XPall)
-model.tables(e.XPall, format = "array", cluster = 11)
-plot(e.XPall, cluster=11)
+(tbl <- model.tables(e.XPall, format = "array", cluster = 11)[,,1])
+# plot(e.XPall, cluster=11)
 
 # what do I want to extract for every individual ?
 # - 2 slopes coefficients
