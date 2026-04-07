@@ -9,34 +9,34 @@
 ##' @param score.sd [numeric>0] noise level (sd) on the measurement.
 ##' TODO - later could be a vector to specify noise level in each phase of the experiment
 ##' (typically lower during plateau phase)
-##' @param pattern 
+##' @param pattern
 ##' @param times [named list or integer vector] times and noise (if any) of simulated measurements,
 ##' for regular strategies.
 ##' Can be a vector with values of time measurements to specify other irregular strategies.
 ##'
 ##' @param breakpoints [data.frame] data.frame with \code{length(pattern)+2} rows
 ##' and 5 columns: \itemize{
-##' \item "pattern" shape of the pattern. Should only contain 1s or 0s, 
+##' \item "pattern" shape of the pattern. Should only contain 1s or 0s,
 ##' never two 0 in a row. The last value is ignored and set to \code{NA}.
 ##' The pattern of the trajectory has as many segments as \code{length(pattern)},
-##' and 1 breakpoint more than the length of pattern (beginning and ending are considered breakpoints). 
-##' Specifying 1 means a slope coefficients is expected to be non-zero, and 0 means a plateau (slope=0). 
+##' and 1 breakpoint more than the length of pattern (beginning and ending are considered breakpoints).
+##' Specifying 1 means a slope coefficients is expected to be non-zero, and 0 means a plateau (slope=0).
 ##' \item "bp.x" every breakpoints x coordinates on the time scale (sorted,
-##' should be between 0 and the end of the trajectory). 
-##' \item "bp.y" every breakpoints y coordinates on the SDI scale (between 0 and 10). 
+##' should be between 0 and the end of the trajectory).
+##' \item "bp.y" every breakpoints y coordinates on the SDI scale (between 0 and 10).
 ##' If \code{pattern[i]==0}, then there should be \code{bp.y[i-1] == bp.y[i]}.
 ##' \item "bp.x.sd" noise (sd) parameter for breakpoints' x coordinates.
 ##' \item "bp.y.sd" noise (sd) parameter for breakpoints' y coordinates.
 ##' If \code{pattern[i]==0}, there should be \code{bp.y.sd[i]==0}
 ##' }
 ##' In case of conflict between pattern and breakpoints specifications, the pattern prevails
-##' and the previous breakpoint specification will override the next one. 
+##' and the previous breakpoint specification will override the next one.
 ##' A warning message will be displayed.
 ##'
 ##' @param break.min.dist [list of numeric] Minimum between-breakpoints distance on
 ##' x & y coordinates. A list with 2 items: \itemize{
-##' \item "x" for x lower bound on distance
-##' \item "y" *IGNORED* for y lower bound on distance
+##' \item "x" [numeric>0] for x lower bound on distance. Default is 0.
+##' \item "y" *IGNORED* [numeric>0] for y lower bound on distance. Default is NA.
 ##' }
 ##' @param na.prob [0<numeric<1] proportion of missing at random values in the dataset.
 ##' @param outlier.prob [0<numeric<1] proportion of outlier in the dataset.
@@ -53,70 +53,81 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
                       breakpoints = NULL, break.min.dist = list(x = 0, y = NA),
                       outlier.prob = 0, na.prob = 0, n.trail = 0L) {
   require(dplyr)
-  
+  require(tidyr)
+
   ## check entries of the function
   # TODO
-  pattern = breakpoints[["pattern"]]
-  
+  pattern <- breakpoints[["pattern"]]
+
   ## normalize parametrization of trajectories
   # TODO
-  
+
   ## simulate breakpoints coordinates
   n.break <- nrow(breakpoints) ## nb of breakpoints
-  break.x.value = matrix(rnorm(n.obs*n.break, breakpoints[["bp.x"]], breakpoints[["bp.x.sd"]]), 
-                         nrow=n.break,dimnames = list(paste0("break.x", 1:n.break), 1:n.obs))
-  
+  break.x.value <- matrix(rnorm(n.obs * n.break, breakpoints[["bp.x"]], breakpoints[["bp.x.sd"]]),
+    nrow = n.break, dimnames = list(paste0("break.x", 1:n.break), 1:n.obs)
+  )
+
   # check breakpoint validity - sorted in time for every individual
   # instead of 0 here we could add a minimal distance between breakpoints
-  while(any(diff(break.x.value)<break.min.dist$x)){
+  while (any(diff(break.x.value) < break.min.dist$x)) {
     # which ind have unsorted break points
-    ind.retry <- which(diff(break.x.value)<break.min.dist$x, arr.ind = T)[, 2]
+    ind.retry <- which(diff(break.x.value) < break.min.dist$x, arr.ind = T)[, 2]
     n.retry <- length(ind.retry)
     # for those ind, re-simulate a vector of breakpoints
-    break.x.value[, ind.retry] = matrix(rnorm(n.retry*n.break, breakpoints[["bp.x"]], 
-                                              breakpoints[["bp.x.sd"]]), 
-                                        nrow = n.break,
-                                        dimnames = list(paste0("break.x", 1:n.break), 
-                                                        ind.retry))
+    break.x.value[, ind.retry] <- matrix(
+      rnorm(
+        n.retry * n.break, breakpoints[["bp.x"]],
+        breakpoints[["bp.x.sd"]]
+      ),
+      nrow = n.break,
+      dimnames = list(
+        paste0("break.x", 1:n.break),
+        ind.retry
+      )
+    )
   }
-  
+
   # simulate height / y-coordinate of breakpoints
-  break.y.value = matrix(rnorm(n.obs*n.break, breakpoints[["bp.y"]], breakpoints[["bp.y.sd"]]), 
-                         nrow=n.break,dimnames = list(paste0("break.y", 1:n.break), 1:n.obs))
+  break.y.value <- matrix(rnorm(n.obs * n.break, breakpoints[["bp.y"]], breakpoints[["bp.y.sd"]]),
+    nrow = n.break, dimnames = list(paste0("break.y", 1:n.break), 1:n.obs)
+  )
   # force height of breakpoints after plateau
-  if(any(pattern==0)){
-    plateau.i <- which(pattern==0) # which segments are plateaus
-    
+  if (any(pattern == 0)) {
+    plateau.i <- which(pattern == 0) # which segments are plateaus
+
     ## warning in case of over-parametrization
     # case 1: sd is specified after plateau (but height is forced)
-    over.param <- breakpoints[["bp.y.sd"]][plateau.i+1]>0
+    over.param <- breakpoints[["bp.y.sd"]][plateau.i + 1] > 0
     # case 2: pre-plateau and post-plateau means are different
-    over.param <- over.param | (breakpoints[["bp.y"]][plateau.i+1]!=breakpoints[["bp.y"]][plateau.i])
-    if(any(over.param)){
-      warning(paste0("Over-parametrization: y-distribution (mean, sd) for breakpoint(s) {", 
-                     paste((plateau.i+1)[which(over.param)], collapse = ", "),
-                     "} is/are ignored because pattern '", 
-                     paste(pattern[1:(n.break-1)], collapse = ""),
-                     "' indicates a plateau for the considered segment(s)."))
+    over.param <- over.param | (breakpoints[["bp.y"]][plateau.i + 1] != breakpoints[["bp.y"]][plateau.i])
+    if (any(over.param)) {
+      warning(paste0(
+        "Over-parametrization: y-distribution (mean, sd) for breakpoint(s) {",
+        paste((plateau.i + 1)[which(over.param)], collapse = ", "),
+        "} is/are ignored because pattern '",
+        paste(pattern[1:(n.break - 1)], collapse = ""),
+        "' indicates a plateau for the considered segment(s)."
+      ))
     }
-    
+
     # plateau overrides over-specified distribution
-    break.y.value[plateau.i+1,] <- break.y.value[plateau.i,]
+    break.y.value[plateau.i + 1, ] <- break.y.value[plateau.i, ]
   }
   break.y.value <- pmax(0, pmin(10, break.y.value))
   break.y.value <- matrix(break.y.value, nrow = n.break)
-  
+
   ## Compute slopes coefficients
   slopes <- diff(break.y.value) / diff(break.x.value)
-  slopes <- slopes[plateau.i-1,] # remove plateau (slope=0)
+  slopes <- slopes[plateau.i - 1, ] # remove plateau (slope=0)
   slopes <- as.data.frame(t(slopes))
-  names(slopes) <- paste0("beta.", plateau.i-1)
-  
+  names(slopes) <- paste0("beta.", plateau.i - 1)
+
   ## Compute ending time of trajectories
-  ending.times <- break.x.value[n.break,]
+  ending.times <- break.x.value[n.break, ]
   max.time <- max(ending.times)
-  
-  
+
+
   ## Derive times of measurements
   if (length(times[["value"]]) == 1) { # regular measurements
     time <- rep(seq(0, max.time + times[["value"]], by = times[["value"]]), n.obs)
@@ -130,8 +141,8 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   if (times[["sd"]] > 0) {
     time[time != 0] <- round(pmax(time[time != 0] + rnorm(length(time[time != 0]), sd = times[["sd"]]), 0))
   }
-  
-  
+
+
   ## Simulated dataset
   sim.dataset <- data.frame(
     ID = as.factor(rep(1:n.obs, each = n.time)),
@@ -142,48 +153,95 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
     ID = as.factor(1:n.obs)
   )
   # add breakpoints coordinates
-  sim.gen.model <- cbind(sim.gen.model, t(break.x.value), t(break.y.value))
-  names(sim.gen.model)[2:11] <- paste0(c("start", paste0("break", 1:(n.break-2)), "end"), 
-                                       rep(c(".x", ".y"), each=n.break))
+  sim.gen.model <- cbind(sim.gen.model, t(break.x.value), t(break.y.value), slopes)
+  # names(sim.gen.model)[2:11] <- paste0(c("start", paste0("break", 1:(n.break-2)), "end"),
+  #                                      rep(c(".x", ".y"), each=n.break))
+  # names(sim.gen.model)[2:11] <- paste0(c("start", rep("break", n.break-2), "end"),
+  #                                      paste0(rep(c(".x", ".y"), each=n.break), (1:n.break-1)))
+  names(sim.gen.model)[2:11] <- paste0(
+    rep("break", n.break),
+    paste0(rep(c(".x", ".y"), each = n.break), (1:n.break - 1))
+  )
+
+  # compute segments number
+  sim.dataset <- sim.dataset %>%
+    left_join(sim.gen.model %>%
+      select(c(1, starts_with("break."))), by = "ID") %>%
+    rowwise() %>% # row-wise cut on time against break x-values
+    mutate(
+      segment = cut(time,
+        breaks = c_across(starts_with("break.x")),
+        labels = 1:(n.break - 1), include.lowest = T
+      ),
+      pattern = pattern[segment]
+    )
+
+  # compute true and noised trajectories
+  # paste0("break.", paste0(c("x", "y"), rep(as.numeric(segment) + c(-1, 0), each=2)))
+  sim.dataset <- sim.dataset %>%
+    pivot_longer(cols = starts_with("break.")) %>%
+    filter(name == paste0("break.y", as.numeric(segment) -1) |
+             name == paste0("break.y", segment) | 
+             name == paste0("break.x", as.numeric(segment) -1) |
+             name == paste0("break.x", segment)) %>%
+    group_by(ID, segment) %>%
+    mutate(
+      # incorrect bcs first values in df not in group (value of ind.1 for everyone)
+      x1 = first(value), x2 = nth(value, 2), 
+      y1 = nth(value, 3), y2 = nth(value, 4),
+      true.traj = if_else(pattern == 0, y1,
+                          approx(c(x1, x2), c(y1, y2), xout = time, ties = "ordered")$y) # works everytime
+    ) %>%
+    ungroup() %>%
+    select(-c(name, value, x1, x2, y1, y2)) %>%
+    distinct()
+  
+  # Adding noised and measured trajectories (integer-round)
+  sim0 <- sim.dataset %>%
+    mutate(
+      noised.traj = true.traj + rnorm(n(), sd = score.sd),
+      # rounded score, including trailing observations
+      score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step, 
+                      pmin(10, pmax(0, round(noised.traj))), NA),
+    )
+  
   
   ## Simulate the "true" and "measured" trajectory (noise added)
-  # TODO
   # sim.dataset <- sim.dataset %>%
+  #   left_join(sim.gen.model %>% select(c(1, starts_with("break.x"))), by = "ID") %>%
+  #   group_by(ID) %>%
   #   mutate(
-  #     # compute "true perfect" trajectory (101 pattern)
-  #     # TODO rewrite with a case_when
-  #     truth.101 = if_else(time < break.1, b.onset * (time / 20),
-  #                         if_else(time < break.2, plateau, plateau + b.return * (time - break.2) / 20)
-  #     ),
-  #     noised.101 = pmin(10, pmax(0, truth.101 + rnorm(n(), sd = score.sd))),
-  #     # truncated end of trajectory
-  #     score = if_else(time < end.time + (1 + n.trail) * time.step, pmin(10, pmax(0, round(noised.101))), NA),
-  #     # trailing at the end: end.time + (1+n.trail)*time.step (to derive)
-  #     truth.101 = pmin(10, pmax(0, truth.101))
+  #     # compute "true perfect" trajectory
+  #     true.traj = NA,
+  #     noised.traj = pmin(10, pmax(0, true.traj + rnorm(n(), sd = score.sd))),
+  #     # truncated end of trajectory, taking trailing observations into account
+  #     score = if_else(time < ending.times + (1 + n.trail) * time.step, pmin(10, pmax(0, round(noised.traj))), NA),
+  #     # segment = replace_when(is.na(segment), n.break)
+  #     # trailing at the end: ending.times + (1+n.trail)*time.step (to derive)
+  #     true.traj = pmin(10, pmax(0, true.traj))
   #   )
-  
-  
+
   ## Adding outliers - patient went to the bathroom
   # Can happen at most once per patient
   # sim.dataset <- sim.dataset |>
   #   group_by(ID) |>
   #   mutate(
   #     # outliers location and draft
-  #     outliers = (row_number() == sample.int(n(), 1)) * rbinom(n(), 1, outlier.prob) == 1, 
+  #     outliers = (row_number() == sample.int(n(), 1)) * rbinom(n(), 1, outlier.prob) == 1,
   #     # outliers is a drop in truth of 1-3 points (still bounded 0<=score<=10)
   #     score = pmin(10, pmax(0, score - sample(1:3, 1, prob = c(1, 4, 4)) * outliers)),
   #     outliers = if_else(is.na(score), NA, outliers)
   #   )
-  
-  
+
+
   ## Adding missing values (Missing Completely At Random)
   # sim.dataset <- sim.dataset %>%
   #   mutate(
   #     na.value = if_else(is.na(score), NA, rbinom(n(), 1, na.prob) == 1),
   #     score = if_else(na.value, NA, score)
   #   )
-  
-  
+
+
   ## export
   class(sim.dataset) <- append("trajData", class(sim.dataset))
   return(list(sim.dataset = sim.dataset, sim.gen.model = sim.gen.model))

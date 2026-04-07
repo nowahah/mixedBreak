@@ -17,7 +17,8 @@ na.prob <- 1 / 10 # measurement probability to be missing
 n.trail <- 0L # nb of trailing observations
 break.min.dist <- list(x = 30, y = 0) # min between-breakpoints distance
 
-n.obs <- 10000L # nb of patients
+n.obs <- 6L # nb of patients
+score.sd <- 1
 breakpoints <- data.frame(
   pattern = c(1, 0, 1, 0, NA),
   bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
@@ -35,8 +36,8 @@ sim.data <- simData10(
   n.trail = n.trail
 )
 
-sim.dataset <- sim.data$sim.dataset
-summary(sim.gen.model <- sim.data$sim.gen.model) # print prettier with coordinates (x, y)
+(sim.dataset <- sim.data$sim.dataset)
+head(sim.gen.model <- sim.data$sim.gen.model) # print prettier with coordinates (x, y)
 
 # # TODO - need to rewrite plot, print, etc. according to new data structure
 # plot(sim.dataset) # default trajectory plot
