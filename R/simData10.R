@@ -33,6 +33,11 @@
 ##' and the previous breakpoint specification will override the next one. 
 ##' A warning message will be displayed.
 ##'
+##' @param break.min.dist [list of numeric] Minimum between-breakpoints distance on
+##' x & y coordinates. A list with 2 items: \itemize{
+##' \item "x" for x lower bound on distance
+##' \item "y" *IGNORED* for y lower bound on distance
+##' }
 ##' @param na.prob [0<numeric<1] proportion of missing at random values in the dataset.
 ##' @param outlier.prob [0<numeric<1] proportion of outlier in the dataset.
 ##' Outliers are simulated as a random drop of 1-3 points in SDI.
@@ -45,7 +50,7 @@
 
 
 simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
-                      breakpoints = NULL,
+                      breakpoints = NULL, break.min.dist = list(x = 0, y = NA),
                       outlier.prob = 0, na.prob = 0, n.trail = 0L) {
   require(dplyr)
   
@@ -63,9 +68,9 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   
   # check breakpoint validity - sorted in time for every individual
   # instead of 0 here we could add a minimal distance between breakpoints
-  while(any(diff(break.x.value)<0)){
+  while(any(diff(break.x.value)<break.min.dist$x)){
     # which ind have unsorted break points
-    ind.retry <- which(diff(break.x.value)<0, arr.ind = T)[, 2]
+    ind.retry <- which(diff(break.x.value)<break.min.dist$x, arr.ind = T)[, 2]
     n.retry <- length(ind.retry)
     # for those ind, re-simulate a vector of breakpoints
     break.x.value[, ind.retry] = matrix(rnorm(n.retry*n.break, breakpoints[["bp.x"]], 
@@ -79,15 +84,18 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   break.y.value = matrix(rnorm(n.obs*n.break, breakpoints[["bp.y"]], breakpoints[["bp.y.sd"]]), 
                          nrow=n.break,dimnames = list(paste0("break.y", 1:n.break), 1:n.obs))
   # force height of breakpoints after plateau
-  if(any(pattern=="0")){
+  if(any(pattern==0)){
     plateau.i <- which(pattern==0) # which segments are plateaus
     
-    # warning in case of over-parametrization
+    ## warning in case of over-parametrization
+    # case 1: sd is specified after plateau (but height is forced)
     over.param <- breakpoints[["bp.y.sd"]][plateau.i+1]>0
+    # case 2: pre-plateau and post-plateau means are different
+    over.param <- over.param | (breakpoints[["bp.y"]][plateau.i+1]!=breakpoints[["bp.y"]][plateau.i])
     if(any(over.param)){
-      warning(paste0("Over-parametrization: sd for breakpoints {", 
+      warning(paste0("Over-parametrization: y-distribution (mean, sd) for breakpoint(s) {", 
                      paste((plateau.i+1)[which(over.param)], collapse = ", "),
-                     "} are ignored because pattern '", 
+                     "} is/are ignored because pattern '", 
                      paste(pattern[1:(n.break-1)], collapse = ""),
                      "' indicates a plateau for the considered segment(s)."))
     }
