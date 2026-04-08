@@ -118,7 +118,7 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
 
   ## Compute slopes coefficients
   slopes <- diff(break.y.value) / diff(break.x.value)
-  slopes.i <- !(1:(n.break-1) %in% plateau.i)
+  slopes.i <- !(1:(n.break - 1) %in% plateau.i)
   slopes <- slopes[slopes.i, ] # remove plateau (slope=0)
   slopes <- as.data.frame(t(slopes))
   names(slopes) <- paste0("beta.", which(slopes.i))
@@ -154,11 +154,7 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   )
   # add breakpoints coordinates
   sim.gen.model <- cbind(sim.gen.model, t(break.x.value), t(break.y.value), slopes)
-  # names(sim.gen.model)[2:11] <- paste0(c("start", paste0("break", 1:(n.break-2)), "end"),
-  #                                      rep(c(".x", ".y"), each=n.break))
-  # names(sim.gen.model)[2:11] <- paste0(c("start", rep("break", n.break-2), "end"),
-  #                                      paste0(rep(c(".x", ".y"), each=n.break), (1:n.break-1)))
-  names(sim.gen.model)[1+1:(2*n.break)] <- paste0(
+  names(sim.gen.model)[1 + 1:(2 * n.break)] <- paste0(
     rep("break", n.break),
     paste0(rep(c(".x", ".y"), each = n.break), (1:n.break - 1))
   )
@@ -177,35 +173,45 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
     )
 
   # compute true and noised trajectories
-  # paste0("break.", paste0(c("x", "y"), rep(as.numeric(segment) + c(-1, 0), each=2)))
   sim.dataset <- sim.dataset %>%
     pivot_longer(cols = starts_with("break.")) %>%
-    filter(name == paste0("break.y", as.numeric(segment) -1) |
-             name == paste0("break.y", segment) | 
-             name == paste0("break.x", as.numeric(segment) -1) |
-             name == paste0("break.x", segment)) %>%
+    filter(
+      name == paste0("break.y", as.numeric(segment) - 1) |
+        name == paste0("break.y", segment) |
+        name == paste0("break.x", as.numeric(segment) - 1) |
+        name == paste0("break.x", segment) |
+        is.na(segment)
+    ) %>%
+    mutate(
+      segment = as.numeric(segment),
+      segment = as.factor(replace_na(segment, n.break-1))
+    ) %>%
+    # adding trailing observations
     group_by(ID, segment) %>%
     mutate(
-      # incorrect bcs first values in df not in group (value of ind.1 for everyone)
-      x1 = first(value), x2 = nth(value, 2), 
+      x1 = first(value), x2 = nth(value, 2),
       y1 = nth(value, 3), y2 = nth(value, 4),
       true.traj = if_else(pattern == 0, y1,
-                          approx(c(x1, x2), c(y1, y2), xout = time, ties = "ordered")$y) # works everytime
+        approx(c(x1, x2), c(y1, y2), xout = time, ties = "ordered", rule = 2)$y
+      ),
+      true.traj = if_else(is.na(true.traj), last(true.traj, na_rm = T), true.traj)
     ) %>%
     ungroup() %>%
     select(-c(name, value, x1, x2, y1, y2)) %>%
     distinct()
-  
+
   # Adding noised and measured trajectories (integer-round)
   sim.dataset <- sim.dataset %>%
     mutate(
       noised.traj = true.traj + rnorm(n(), sd = score.sd),
       # rounded score, including trailing observations
-      score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step, 
-                      pmin(10, pmax(0, round(noised.traj))), NA),
-    )
-  
-  
+      score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step,
+        pmin(10, pmax(0, round(noised.traj))), NA
+      ),
+    ) %>%
+    print(n = 20L)
+
+
   ## Simulate the "true" and "measured" trajectory (noise added)
   # sim.dataset <- sim.dataset %>%
   #   left_join(sim.gen.model %>% select(c(1, starts_with("break.x"))), by = "ID") %>%

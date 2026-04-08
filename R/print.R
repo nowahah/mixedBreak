@@ -7,7 +7,7 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
   }else{
     # Prints simulated data
     if(n.lines>0L){
-      print(cat(paste0("\nSimulated data head (", n.lines," lines):")))
+      print(cat(paste0("\nSimulated data head(", n.lines,"):")))
       print.data.frame(
         sim.data$sim.dataset %>% 
           filter(ID %in% cluster) %>% 

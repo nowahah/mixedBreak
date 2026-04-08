@@ -17,7 +17,7 @@ time.spec <- list("value" = c(0, 10, 20, 30, 40, 60, 120), "sd" = 1) # specific 
 outlier.prob <- 1 / 2 # individual probability of having exactly one outlier observation
 na.prob <- 1 / 10 # measurement probability to be missing
 n.trail <- 0L # nb of trailing observations
-break.min.dist <- list(x = 30, y = 0) # min between-breakpoints distance
+break.min.dist <- list(x = 45, y = 0) # min between-breakpoints distance
 
 n.obs <- 6L # nb of patients
 score.sd <- .5
@@ -26,15 +26,15 @@ break.5 <- data.frame(
   bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
   bp.y = c(0, 9.5, 9.5, 1, 1),   # height of breakpoints
   bp.x.sd = c(0, 100, 100, 100, 100),  # noise levels
-  bp.y.sd = c(0, 1, 0, 1, 0)
+  bp.y.sd = c(0, 1, 0, 1, 1)
 )
 
 break.4 <- data.frame(
-  pattern = c(1, 1, 1, NA),
+  pattern = c(1, 0, 1, NA),
   bp.x = c(0, 90, 180, 300),    # psi, time coordinate of breakpoints
   bp.y = c(0, 9.5, 9.5, 1),   # height of breakpoints
   bp.x.sd = c(0, 50, 50, 50),  # noise levels
-  bp.y.sd = c(0, 1, 1, 1)
+  bp.y.sd = c(0, 1, 0, 1)
 )
 
 break.3 <- data.frame(
@@ -48,7 +48,8 @@ break.3 <- data.frame(
 # TEST
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = break.5,
+  breakpoints = break.4,
+  break.min.dist = break.min.dist,
   outlier.prob = outlier.prob,
   na.prob = na.prob,
   n.trail = n.trail
