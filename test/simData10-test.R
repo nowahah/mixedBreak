@@ -3,6 +3,8 @@
 # source("R/DataLoader.R")
 
 source("R/simData10.R")
+source("R/plot.R")
+source("R/print.R")
 
 library(ggplot2)
 
@@ -18,36 +20,58 @@ n.trail <- 0L # nb of trailing observations
 break.min.dist <- list(x = 30, y = 0) # min between-breakpoints distance
 
 n.obs <- 6L # nb of patients
-score.sd <- 1
-breakpoints <- data.frame(
-  pattern = c(1, 0, 1, 0, NA),
+score.sd <- .5
+break.5 <- data.frame(
+  pattern = c(1, 0, 1, 1, NA),
   bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
   bp.y = c(0, 9.5, 9.5, 1, 1),   # height of breakpoints
   bp.x.sd = c(0, 100, 100, 100, 100),  # noise levels
   bp.y.sd = c(0, 1, 0, 1, 0)
 )
 
+break.4 <- data.frame(
+  pattern = c(1, 1, 1, NA),
+  bp.x = c(0, 90, 180, 300),    # psi, time coordinate of breakpoints
+  bp.y = c(0, 9.5, 9.5, 1),   # height of breakpoints
+  bp.x.sd = c(0, 50, 50, 50),  # noise levels
+  bp.y.sd = c(0, 1, 1, 1)
+)
+
+break.3 <- data.frame(
+  pattern = c(1, 1, NA),
+  bp.x = c(0, 180, 300),    # psi, time coordinate of breakpoints
+  bp.y = c(0, 9.5, 1),   # height of breakpoints
+  bp.x.sd = c(0, 50, 50),  # noise levels
+  bp.y.sd = c(0, 1, 1)
+)
+
 # TEST
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = breakpoints,
+  breakpoints = break.5,
   outlier.prob = outlier.prob,
   na.prob = na.prob,
   n.trail = n.trail
 )
 
-(sim.dataset <- sim.data$sim.dataset)
-head(sim.gen.model <- sim.data$sim.gen.model) # print prettier with coordinates (x, y)
+sim.dataset <- sim.data$sim.dataset
+sim.gen.model <- sim.data$sim.gen.model
 
-# # TODO - need to rewrite plot, print, etc. according to new data structure
+## Default methods for trajData objects
+# plot
 plot(sim.data) # default trajectory plot
-# print(sim.data) # data generation model
-# 
-# print(sim.data, default = T) # default method for tbl_df
-# print(sim.data, n.line = 10L, dgm = F) # dataset of observations
-# (sim.measurements <- subset(sim.dataset))
-# # Higher variance during plateau (especially if peak <≈ 10) -> not realistic (need lower variance during plateau)
+plot(sim.data, cluster = 1:4)
+plot(sim.data, cluster = 1:4, breakpoints = F)
+plot(sim.data, cluster = 1:4, lines = F)
+plot(sim.data, cluster = 1:4, alpha = .5, true.color = "orange2")
 
-# ## slopes distribution density plot
-# ggplot(slopes, aes(x=beta.1, y=beta.3)) + 
+# print
+print(sim.data) # data and data generation model
+print(sim.data, cluster = c(2,5))
+print(sim.data, cluster = c(2,5), n.lines = 3L) # choose nb of lines of data to print
+print(sim.data, cluster = c(2,5), dgm = F) # choose not to print data generation model
+
+
+# ## slopes distribution density plot (need enough observations to be beautiful - and meaningful)
+# ggplot(sim.gen.model, aes(x=beta.1, y=beta.3)) +
 #   stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white")

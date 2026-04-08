@@ -27,15 +27,17 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
       title = "Simulated Subjective Drug Intensity over time for all patients",
       x = "Time since drug intake (minutes)", y = "SDI"
     )
+    
+  # breakpoints coordinates
+  break.data <- sim.data$sim.gen.model %>%
+    filter(ID %in% cluster) %>%
+    select(-starts_with("beta.")) %>%
+    pivot_longer(cols = starts_with("break.x"), names_to = "break.x", values_to = "x.coord") %>%
+    pivot_longer(cols = starts_with("break.y"), names_to = "break.y", values_to = "y.coord") %>%
+    filter(str_sub(break.x, -1L) == str_sub(break.y, -1L))
 
   # Add Breakpoints on the graph
   if(breakpoints){
-    break.data <- sim.data$sim.gen.model %>%
-      filter(ID %in% cluster) %>%
-      select(-starts_with("beta.")) %>%
-      pivot_longer(cols = starts_with("break.x"), names_to = "break.x", values_to = "x.coord") %>%
-      pivot_longer(cols = starts_with("break.y"), names_to = "break.y", values_to = "y.coord") %>%
-      filter(str_sub(break.x, -1L) == str_sub(break.y, -1L))
     
     p <- p +
       geom_point(

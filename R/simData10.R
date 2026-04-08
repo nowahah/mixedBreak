@@ -93,9 +93,8 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
     nrow = n.break, dimnames = list(paste0("break.y", 1:n.break), 1:n.obs)
   )
   # force height of breakpoints after plateau
-  if (any(pattern == 0)) {
-    plateau.i <- which(pattern == 0) # which segments are plateaus
-
+  plateau.i <- which(pattern == 0) # which segments are plateaus
+  if (any(pattern == 0, na.rm = T)) {
     ## warning in case of over-parametrization
     # case 1: sd is specified after plateau (but height is forced)
     over.param <- breakpoints[["bp.y.sd"]][plateau.i + 1] > 0
@@ -119,9 +118,10 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
 
   ## Compute slopes coefficients
   slopes <- diff(break.y.value) / diff(break.x.value)
-  slopes <- slopes[plateau.i - 1, ] # remove plateau (slope=0)
+  slopes.i <- !(1:(n.break-1) %in% plateau.i)
+  slopes <- slopes[slopes.i, ] # remove plateau (slope=0)
   slopes <- as.data.frame(t(slopes))
-  names(slopes) <- paste0("beta.", plateau.i - 1)
+  names(slopes) <- paste0("beta.", which(slopes.i))
 
   ## Compute ending time of trajectories
   ending.times <- break.x.value[n.break, ]
@@ -158,7 +158,7 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   #                                      rep(c(".x", ".y"), each=n.break))
   # names(sim.gen.model)[2:11] <- paste0(c("start", rep("break", n.break-2), "end"),
   #                                      paste0(rep(c(".x", ".y"), each=n.break), (1:n.break-1)))
-  names(sim.gen.model)[2:11] <- paste0(
+  names(sim.gen.model)[1+1:(2*n.break)] <- paste0(
     rep("break", n.break),
     paste0(rep(c(".x", ".y"), each = n.break), (1:n.break - 1))
   )
