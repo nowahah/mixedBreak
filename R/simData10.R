@@ -197,7 +197,7 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
     distinct()
   
   # Adding noised and measured trajectories (integer-round)
-  sim0 <- sim.dataset %>%
+  sim.dataset <- sim.dataset %>%
     mutate(
       noised.traj = true.traj + rnorm(n(), sd = score.sd),
       # rounded score, including trailing observations
@@ -243,8 +243,9 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
 
 
   ## export
-  class(sim.dataset) <- append("trajData", class(sim.dataset))
-  return(list(sim.dataset = sim.dataset, sim.gen.model = sim.gen.model))
+  sim.data <- list(sim.dataset = sim.dataset, sim.gen.model = sim.gen.model)
+  class(sim.data) <- append("trajData", class(sim.dataset))
+  return(sim.data)
 }
 
 # breakpoints |> mutate(duration = c(diff(bp.x), NA), slope = c(diff(bp.y)/diff(bp.x), NA))

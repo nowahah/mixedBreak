@@ -40,11 +40,11 @@ sim.data <- simData10(
 head(sim.gen.model <- sim.data$sim.gen.model) # print prettier with coordinates (x, y)
 
 # # TODO - need to rewrite plot, print, etc. according to new data structure
-# plot(sim.dataset) # default trajectory plot
-# print(sim.dataset) # data generation model
+plot(sim.data) # default trajectory plot
+# print(sim.data) # data generation model
 # 
-# # print(sim.dataset, default = T) # default method for data.frame
-# print(sim.dataset, n.line = 10L, dgm = F) # dataset of observations
+# print(sim.data, default = T) # default method for tbl_df
+# print(sim.data, n.line = 10L, dgm = F) # dataset of observations
 # (sim.measurements <- subset(sim.dataset))
 # # Higher variance during plateau (especially if peak <≈ 10) -> not realistic (need lower variance during plateau)
 
