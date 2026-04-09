@@ -20,7 +20,7 @@ n.trail <- -1L # nb of trailing observations
 break.min.dist <- list(x = 45, y = 0) # min between-breakpoints distance
 
 n.obs <- 6L # nb of patients
-score.sd <- .75
+score.sd <- .5
 break.5 <- data.frame(
   pattern = c(1, 0, 1, 0, NA),
   bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
@@ -48,7 +48,7 @@ break.3 <- data.frame(
 # TEST
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = break.5,
+  breakpoints = break.3,
   break.min.dist = break.min.dist,
   outlier.prob = outlier.prob,
   na.prob = na.prob,

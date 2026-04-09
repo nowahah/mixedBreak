@@ -197,7 +197,6 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
              (is.na(segment) & (name %in% paste0(rep(paste0("break.", c("x", "y")), each=2), 
                                                  n.break - c(2, 1))))) %>%
     mutate(
-      # pb here bcs x1..y2 cant be eval if n.trail <3, need to handle the case
       x1 = first(value), x2 = nth(value, 2), 
       y1 = nth(value, 3), y2 = nth(value, 4),
       true.traj = case_when(
@@ -219,6 +218,7 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
       score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step, 
                       pmin(10, pmax(0, round(noised.traj))), NA)
       # trailing is checked bcs due to noise on time of measurements, the nb of trailing may change
+      # TODO - should trailling be noised as well ?
     )
   
 
@@ -240,10 +240,15 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
   sim.dataset <- sim.dataset %>%
     mutate(
       na.flag = if_else(is.na(score), NA, rbinom(n(), 1, na.prob) == 1),
-      score = if_else(na.flag, NA, score)
+      score = if_else(na.flag, NA, score),
+      type = case_when(
+        outliers ~ "outlier",
+        is.na(pattern) ~ "trailing",
+        .default = "signal"
+      )
     )
-
-
+  
+  
   ## export
   sim.data <- list(sim.dataset = sim.dataset, sim.gen.model = sim.gen.model)
   class(sim.data) <- append("trajData", class(sim.dataset))

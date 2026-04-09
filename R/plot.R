@@ -13,18 +13,26 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   
   traj.data <- sim.data$sim.dataset %>%
     filter(ID %in% cluster)
-  pattern <- diff((sim.data$sim.dataset %>% filter(ID==1))$pattern)
-  pattern <- pattern[pattern!=0]
+  
+  # deriving pattern for display
+  pattern <- diff((traj.data %>% filter(ID==cluster[1]))$pattern)
+  pattern <- pattern[pattern!=0 & !is.na(pattern)]
   pattern[pattern==-1] <- 0
   pattern <- paste0("1", paste(pattern, collapse = ""))
   
-  # TODO add factor variable to code and display normal / outlier / missing
-  p <- ggplot(traj.data, aes(x = time, y = score, color = outliers)) + 
+  # points customization
+  cols = c("signal" = "blue", "outlier" = "red", "trailing" = "black")
+  pchs = c("signal" = 19, "outlier" = 17, "trailing" = 1)
+  
+  # main plot
+  p <- ggplot(traj.data, aes(x = time, y = score, color = type, shape = type)) + 
     geom_point() +
     facet_wrap(~ID) +
 
-    # custom y ticks
+    # custom y ticks and points style
     scale_y_continuous(breaks = seq(0, 10, by = 2), limits = c(0, 10)) +
+    scale_color_manual(values = cols) + # custom point colors according to measurement type
+    scale_shape_manual(values = pchs) + # same but for shape
 
     # labels
     labs(
@@ -57,9 +65,13 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
     p <- p +
       geom_line(
         data = traj.data %>%
-          add_row(ID=break.data$ID, time=break.data$x.coord, true.traj=break.data$y.coord) %>%
+          add_row(ID=break.data$ID, 
+                  time=break.data$x.coord, 
+                  true.traj=break.data$y.coord,
+                  type = "breakpoints") %>%
           arrange(ID, time),
-        mapping = aes(x = time, y = true.traj), colour = true.color, alpha = alpha
+        mapping = aes(x = time, y = true.traj), 
+        inherit.aes = F, colour = true.color, alpha = alpha
       )
   }
   
