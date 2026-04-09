@@ -17,7 +17,8 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
     
     # Prints Data Generation Model
     if(dgm){
-      print(cat("\nData Generation Model:"))
+      pattern <- sim.data$sim.dataset
+      print(cat("\nData Generation Model - pattern "))
       
       # breakpoints coordinates 
       break.data <- sim.data$sim.gen.model %>%
@@ -35,7 +36,8 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
           bp.coord = paste0("(", round(x.coord, 1), ", ", round(y.coord, 1), ")"),
           bp.nb = paste0("break.", str_extract(break.x, "\\d"))
         ) %>%
-        pivot_wider(id_cols=ID, names_from = "bp.nb", values_from = "bp.coord")
+        pivot_wider(id_cols=ID, names_from = "bp.nb", values_from = "bp.coord") %>%
+        print()
       
     }
   }

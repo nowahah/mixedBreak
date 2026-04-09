@@ -13,6 +13,10 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   
   traj.data <- sim.data$sim.dataset %>%
     filter(ID %in% cluster)
+  pattern <- diff((sim.data$sim.dataset %>% filter(ID==1))$pattern)
+  pattern <- pattern[pattern!=0]
+  pattern[pattern==-1] <- 0
+  pattern <- paste0("1", paste(pattern, collapse = ""))
   
   # TODO add factor variable to code and display normal / outlier / missing
   p <- ggplot(traj.data, aes(x = time, y = score)) + # , color=outliers
@@ -24,7 +28,8 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
 
     # labels
     labs(
-      title = "Simulated Subjective Drug Intensity over time for all patients",
+      title = paste("Simulated Subjective Drug Intensity over time per patient - pattern",
+                    pattern),
       x = "Time since drug intake (minutes)", y = "SDI"
     )
     

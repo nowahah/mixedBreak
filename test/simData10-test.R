@@ -16,13 +16,13 @@ time.spec <- list("value" = c(0, 10, 20, 30, 40, 60, 120), "sd" = 1) # specific 
 
 outlier.prob <- 1 / 2 # individual probability of having exactly one outlier observation
 na.prob <- 1 / 10 # measurement probability to be missing
-n.trail <- 0L # nb of trailing observations
+n.trail <- -1L # nb of trailing observations
 break.min.dist <- list(x = 45, y = 0) # min between-breakpoints distance
 
 n.obs <- 6L # nb of patients
-score.sd <- .5
+score.sd <- .75
 break.5 <- data.frame(
-  pattern = c(1, 0, 1, 1, NA),
+  pattern = c(1, 0, 1, 0, NA),
   bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
   bp.y = c(0, 9.5, 9.5, 1, 1),   # height of breakpoints
   bp.x.sd = c(0, 100, 100, 100, 100),  # noise levels
@@ -52,11 +52,10 @@ sim.data <- simData10(
   break.min.dist = break.min.dist,
   outlier.prob = outlier.prob,
   na.prob = na.prob,
-  n.trail = n.trail
-)
-
-sim.dataset <- sim.data$sim.dataset
-sim.gen.model <- sim.data$sim.gen.model
+  n.trail = -1
+) 
+# sim.dataset <- sim.data$sim.dataset
+# sim.gen.model <- sim.data$sim.gen.model
 
 ## Default methods for trajData objects
 # plot
@@ -74,5 +73,5 @@ print(sim.data, cluster = c(2,5), dgm = F) # choose not to print data generation
 
 
 # ## slopes distribution density plot (need enough observations to be beautiful - and meaningful)
-# ggplot(sim.gen.model, aes(x=beta.1, y=beta.3)) +
+# ggplot(sim.data$sim.gen.model, aes(x=beta.1, y=beta.3)) +
 #   stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white")
