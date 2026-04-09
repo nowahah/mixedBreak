@@ -48,11 +48,11 @@ break.3 <- data.frame(
 # TEST
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = break.4,
+  breakpoints = break.5,
   break.min.dist = break.min.dist,
   outlier.prob = outlier.prob,
   na.prob = na.prob,
-  n.trail = -1
+  n.trail = n.trail
 ) 
 # sim.dataset <- sim.data$sim.dataset
 # sim.gen.model <- sim.data$sim.gen.model

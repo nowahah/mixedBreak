@@ -6,7 +6,7 @@ require(stringr)
 
 plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
                           cluster = 1:nrow(sim.data$sim.dataset),
-                          alpha = .75, true.color = "green4") {
+                          alpha = .65, true.color = "green4") {
   if(default){
     print.default(sim.data)
   }
@@ -19,7 +19,7 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   pattern <- paste0("1", paste(pattern, collapse = ""))
   
   # TODO add factor variable to code and display normal / outlier / missing
-  p <- ggplot(traj.data, aes(x = time, y = score)) + # , color=outliers
+  p <- ggplot(traj.data, aes(x = time, y = score, color = outliers)) + 
     geom_point() +
     facet_wrap(~ID) +
 

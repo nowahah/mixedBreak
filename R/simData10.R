@@ -221,41 +221,27 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
       # trailing is checked bcs due to noise on time of measurements, the nb of trailing may change
     )
   
-  
-  ## Simulate the "true" and "measured" trajectory (noise added)
-  # sim.dataset <- sim.dataset %>%
-  #   left_join(sim.gen.model %>% select(c(1, starts_with("break.x"))), by = "ID") %>%
-  #   group_by(ID) %>%
-  #   mutate(
-  #     # compute "true perfect" trajectory
-  #     true.traj = NA,
-  #     noised.traj = pmin(10, pmax(0, true.traj + rnorm(n(), sd = score.sd))),
-  #     # truncated end of trajectory, taking trailing observations into account
-  #     score = if_else(time < ending.times + (1 + n.trail) * time.step, pmin(10, pmax(0, round(noised.traj))), NA),
-  #     # segment = replace_when(is.na(segment), n.break)
-  #     # trailing at the end: ending.times + (1+n.trail)*time.step (to derive)
-  #     true.traj = pmin(10, pmax(0, true.traj))
-  #   )
 
   ## Adding outliers - patient went to the bathroom
   # Can happen at most once per patient
-  # sim.dataset <- sim.dataset |>
-  #   group_by(ID) |>
-  #   mutate(
-  #     # outliers location and draft
-  #     outliers = (row_number() == sample.int(n(), 1)) * rbinom(n(), 1, outlier.prob) == 1,
-  #     # outliers is a drop in truth of 1-3 points (still bounded 0<=score<=10)
-  #     score = pmin(10, pmax(0, score - sample(1:3, 1, prob = c(1, 4, 4)) * outliers)),
-  #     outliers = if_else(is.na(score), NA, outliers)
-  #   )
+  sim.dataset <- sim.dataset %>%
+    group_by(ID) %>%
+    mutate(
+      # outliers location and draft
+      outliers = (row_number() == sample.int(n(), 1)) * rbinom(n(), 1, outlier.prob) == 1,
+      # outliers is a drop in truth of 1-3 points (still bounded 0<=score<=10)
+      score = pmin(10, pmax(0, score - sample(1:3, 1, prob = c(1, 4, 4)) * outliers)),
+      outliers = if_else(is.na(score), NA, outliers)
+    ) %>%
+    ungroup()
 
 
   ## Adding missing values (Missing Completely At Random)
-  # sim.dataset <- sim.dataset %>%
-  #   mutate(
-  #     na.value = if_else(is.na(score), NA, rbinom(n(), 1, na.prob) == 1),
-  #     score = if_else(na.value, NA, score)
-  #   )
+  sim.dataset <- sim.dataset %>%
+    mutate(
+      na.flag = if_else(is.na(score), NA, rbinom(n(), 1, na.prob) == 1),
+      score = if_else(na.flag, NA, score)
+    )
 
 
   ## export
