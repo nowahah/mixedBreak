@@ -3,6 +3,8 @@
 # source("R/DataLoader.R")
 
 source("R/simData10.R")
+source("R/trueTraj.R")
+source("R/noiseTraj.R")
 source("R/plot.R")
 source("R/print.R")
 
@@ -43,7 +45,8 @@ break.3 <- data.frame(
   bp.y.sd = c(0, 1, 1)
 )
 
-# TEST
+## TEST
+# simData10.R
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
   breakpoints = break.4,
@@ -52,6 +55,13 @@ sim.data <- simData10(
   na.prob = na.prob,
   n.trail = n.trail
 ) 
+
+# splitted trueTraj.R & noiseTraj.R
+breakpoints <- break.5
+true.traj <- trueTraj(times[["value"]], breakpoints[1:3])
+sim.data <- noiseTraj(true.traj, n.obs, score.sd, times.sd = times[["sd"]],
+                      breakpoints.sd = breakpoints[4:5], break.x.dist = 20,
+                      outlier.prob = 0, na.prob = 0, n.trail = 0L)
 # sim.dataset <- sim.data$sim.dataset
 # sim.gen.model <- sim.data$sim.gen.model
 

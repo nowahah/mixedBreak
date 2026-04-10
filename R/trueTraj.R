@@ -1,5 +1,5 @@
-### truthTraj.R ---
-## * truthTraj.R (documentation)
+### trueTraj.R ---
+## * trueTraj.R (documentation)
 ##' @title Simulate "10"-alike trajectories with known true parameters
 ##' @description Specify the simulation model for SDI trajectories in patients after psilocybin intake.
 ##' Any "10"-alike pattern can be specified with breakpoints coordinates and noise level.
@@ -27,8 +27,11 @@
 ##' and other characteristics such as outlier or missing value flag
 
 
-truthTraj <- function(times = 20L, breakpoints = NULL){
-  require(dplyr)
+trueTraj <- function(times = 20L, breakpoints = NULL){
+
+    traj.truth <- list(times = times, breakpoints = breakpoints)
   
-  
+  class(traj.truth) <- append("trajTruth", class(traj.truth))
+  return(traj.truth)
 }
+

@@ -1,10 +1,17 @@
-library(dplyr)
+## Method for object of class 'trajTruth'
+print.trajTruth <- function(true.traj){
+  print.default(true.traj)
+}
 
+
+## Method for object of class 'trajData'
 print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
                            cluster = levels(sim.data$sim.dataset$ID)){
   if(default){
     print.data.frame(sim.data)
   }else{
+    require(dplyr)
+    
     traj.data <- sim.data$sim.dataset %>%
       filter(ID %in% cluster)
     
