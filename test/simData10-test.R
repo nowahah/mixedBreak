@@ -6,8 +6,6 @@ source("R/simData10.R")
 source("R/plot.R")
 source("R/print.R")
 
-library(ggplot2)
-
 
 # different time specifications
 time.reg <- list("value" = 20, "sd" = 0) # default regular "perfect" measurement strategy
@@ -48,7 +46,7 @@ break.3 <- data.frame(
 # TEST
 sim.data <- simData10(
   n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = break.3,
+  breakpoints = break.4,
   break.min.dist = break.min.dist,
   outlier.prob = outlier.prob,
   na.prob = na.prob,

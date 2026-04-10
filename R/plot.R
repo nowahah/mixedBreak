@@ -15,10 +15,12 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
     filter(ID %in% cluster)
   
   # deriving pattern for display
-  pattern <- diff((traj.data %>% filter(ID==cluster[1]))$pattern)
-  pattern <- pattern[pattern!=0 & !is.na(pattern)]
-  pattern[pattern==-1] <- 0
-  pattern <- paste0("1", paste(pattern, collapse = ""))
+  pattern <- traj.data %>% 
+    filter(ID==cluster[1]) %>% 
+    group_by(segment) %>% 
+    summarise(pattern = pattern[1])
+  pattern <- pattern$pattern
+  pattern <- paste(pattern[!is.na(pattern)], collapse="")
   
   # points customization
   cols = c("signal" = "blue", "outlier" = "red", "trailing" = "black")
@@ -61,7 +63,7 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   
   # Add the true trajectory
   if(lines){
-    # TODO - add breakpoints in the data to have proper angles at breaks
+    # adding breakpoints coord to have proper angles
     p <- p +
       geom_line(
         data = traj.data %>%

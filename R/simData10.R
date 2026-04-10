@@ -9,12 +9,11 @@
 ##' @param score.sd [numeric>0] noise level (sd) on the measurement.
 ##' TODO - later could be a vector to specify noise level in each phase of the experiment
 ##' (typically lower during plateau phase)
-##' @param pattern
 ##' @param times [named list or integer vector] times and noise (if any) of simulated measurements,
 ##' for regular strategies.
 ##' Can be a vector with values of time measurements to specify other irregular strategies.
 ##'
-##' @param breakpoints [data.frame] data.frame with \code{length(pattern)+2} rows
+##' @param breakpoints [data.frame] data.frame with \code{length(pattern)+1} rows
 ##' and 5 columns: \itemize{
 ##' \item "pattern" shape of the pattern. Should only contain 1s or 0s,
 ##' never two 0 in a row. The last value is ignored and set to \code{NA}.
@@ -44,7 +43,7 @@
 ##' @param n.trail [integer] number of trailing observations at the end of the trajectory.
 ##' Default is 0. Has a meaning when positive. 
 ##' If negative, it will remove the last observations from the trajectory.
-##' TODO - IGNORED if pattern ends with a 0 / plateau
+##' Ignored if pattern ends with a 0 / plateau
 ##'
 ##'
 ##' @return A dataset with n.obs trajectories of SDI, simulated according to specified parameters
