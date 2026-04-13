@@ -59,8 +59,7 @@ sim.data <- simData10(
 # splitted trueTraj.R & noiseTraj.R
 breakpoints <- break.4
 true.traj <- trueTraj(times[["value"]], breakpoints[1:3])
-sim.data <- noiseTraj(true.traj, 
-                      n.obs, score.sd, times.sd = times[["sd"]],
+sim.data <- noiseTraj(true.traj, n.obs, score.sd, times.sd = times[["sd"]],
                       breakpoints.sd = breakpoints[4:5], break.x.dist = 20,
                       outlier.prob = outlier.prob, na.prob = na.prob, n.trail = 1L)
 # sim.dataset <- sim.data$sim.dataset

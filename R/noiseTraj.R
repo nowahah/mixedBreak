@@ -50,7 +50,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   # TODO
   # check type of entries, length
   
-  # get infos from trueTraj back
+  # extract information contained in 'trueTraj' object
   breakpoints <- cbind(true.traj$breakpoints, breakpoints.sd)
   times <- list(value = true.traj$times, sd = times.sd)
   
@@ -65,31 +65,35 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   ## normalize parametrization of trajectories
   # TODO
   
-  ## simulate breakpoints coordinates
+  ## simulate between-breakpoints distances to compute coordinates
   n.break <- nrow(breakpoints) ## nb of breakpoints
-  break.x.value <- matrix(rnorm(n.obs * n.break, breakpoints[["bp.x"]], breakpoints[["bp.x.sd"]]),
-                          nrow = n.break, dimnames = list(paste0("break.x", 1:n.break), 1:n.obs)
+  mu <- diff(breakpoints[["bp.x"]])
+  std <- breakpoints[["bp.x.sd"]][2:n.break]
+  break.x.dist <- matrix(rlnorm(n.obs * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),
+                         nrow = n.break-1, dimnames = list(paste0("break.x", 1:(n.break-1)), 1:n.obs)
   )
   
-  # check breakpoint validity - sorted in time for every individual
-  # instead of 0 here we could add a minimal distance between breakpoints
-  while (any(diff(break.x.value) < break.min.dist$x)) {
+  ## check distance validity - bounded by break.min.dist$x
+  while (any(break.x.dist < break.min.dist$x)) {
     # which ind have unsorted break points
-    ind.retry <- which(diff(break.x.value) < break.min.dist$x, arr.ind = T)[, 2]
+    ind.retry <- which(break.x.dist < break.min.dist$x, arr.ind = T)[, 2]
     n.retry <- length(ind.retry)
     # for those ind, re-simulate a vector of breakpoints
-    break.x.value[, ind.retry] <- matrix(
-      rnorm(
-        n.retry * n.break, breakpoints[["bp.x"]],
-        breakpoints[["bp.x.sd"]]
-      ),
-      nrow = n.break,
-      dimnames = list(
-        paste0("break.x", 1:n.break),
-        ind.retry
-      )
+    break.x.dist[, ind.retry] <- matrix(
+      rlnorm(
+        n.retry * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),
+      nrow = n.break-1, dimnames = list(paste0("break.x", 1:(n.break-1)), ind.retry)
     )
   }
+  
+  break.x.value <- rbind(
+    rep(0, n.obs),
+    apply(break.x.dist, 2, cumsum)
+  )
+  
+  # checking parameters
+  apply(break.x.value, 1, mean)
+  apply(break.x.value, 1, sd) # generally variance tends to stack because of the sum of r.v.
   
   # simulate height / y-coordinate of breakpoints
   break.y.value <- matrix(rnorm(n.obs * n.break, breakpoints[["bp.y"]], breakpoints[["bp.y.sd"]]),
