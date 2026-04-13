@@ -29,7 +29,7 @@
 
 trueTraj <- function(times = 20L, breakpoints = NULL){
 
-    traj.truth <- list(times = times, breakpoints = breakpoints)
+  traj.truth <- list(times = times, breakpoints = breakpoints)
   
   class(traj.truth) <- append("trajTruth", class(traj.truth))
   return(traj.truth)

@@ -23,25 +23,25 @@ n.obs <- 6L # nb of patients
 score.sd <- .5
 break.5 <- data.frame(
   pattern = c(1, 0, 1, 0, NA),
-  bp.x = c(0, 90, 180, 250, 360),    # psi, time coordinate of breakpoints
-  bp.y = c(0, 9.5, 9.5, 1, 1),   # height of breakpoints
+  bp.x = c(0, 90, 180, 250, 360),      # psi, time coordinate of breakpoints
+  bp.y = c(0, 9.5, 9.5, 1, 1),         # height of breakpoints
   bp.x.sd = c(0, 100, 100, 100, 100),  # noise levels
   bp.y.sd = c(0, 1, 0, 1, 1)
 )
 
 break.4 <- data.frame(
   pattern = c(1, 0, 1, NA),
-  bp.x = c(0, 90, 180, 300),    # psi, time coordinate of breakpoints
-  bp.y = c(0, 9.5, 9.5, 1),   # height of breakpoints
-  bp.x.sd = c(0, 50, 50, 50),  # noise levels
+  bp.x = c(0, 90, 180, 300),       # psi, time coordinate of breakpoints
+  bp.y = c(0, 9.5, 9.5, 1),        # height of breakpoints
+  bp.x.sd = c(0, 50, 50, 50),      # noise levels
   bp.y.sd = c(0, 1, 0, 1)
 )
 
 break.3 <- data.frame(
   pattern = c(1, 1, NA),
   bp.x = c(0, 180, 300),    # psi, time coordinate of breakpoints
-  bp.y = c(0, 9.5, 1),   # height of breakpoints
-  bp.x.sd = c(0, 50, 50),  # noise levels
+  bp.y = c(0, 9.5, 1),      # height of breakpoints
+  bp.x.sd = c(0, 50, 50),   # noise levels
   bp.y.sd = c(0, 1, 1)
 )
 
@@ -57,16 +57,18 @@ sim.data <- simData10(
 ) 
 
 # splitted trueTraj.R & noiseTraj.R
-breakpoints <- break.5
+breakpoints <- break.4
 true.traj <- trueTraj(times[["value"]], breakpoints[1:3])
-sim.data <- noiseTraj(true.traj, n.obs, score.sd, times.sd = times[["sd"]],
+sim.data <- noiseTraj(true.traj, 
+                      n.obs, score.sd, times.sd = times[["sd"]],
                       breakpoints.sd = breakpoints[4:5], break.x.dist = 20,
-                      outlier.prob = 0, na.prob = 0, n.trail = 0L)
+                      outlier.prob = outlier.prob, na.prob = na.prob, n.trail = 1L)
 # sim.dataset <- sim.data$sim.dataset
 # sim.gen.model <- sim.data$sim.gen.model
 
 ## Default methods for trajData objects
 # plot
+plot(true.traj)
 plot(sim.data) # default trajectory plot
 plot(sim.data, cluster = 1:4)
 plot(sim.data, cluster = 1:4, breakpoints = F)

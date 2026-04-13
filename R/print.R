@@ -1,6 +1,6 @@
 ## Method for object of class 'trajTruth'
 print.trajTruth <- function(true.traj){
-  print.default(true.traj)
+  print.data.frame(true.traj)
 }
 
 
@@ -10,6 +10,7 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
   if(default){
     print.data.frame(sim.data)
   }else{
+    require(stringr)
     require(dplyr)
     
     traj.data <- sim.data$sim.dataset %>%
@@ -27,7 +28,7 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
         filter(ID==cluster[1]) %>% 
         group_by(segment) %>% 
         summarise(pattern = pattern[1])
-      pattern <- pattern$pattern[!is.na(pattern)]
+      pattern <- pattern$pattern[!is.na(pattern$pattern)]
       pattern <- paste(pattern, collapse="")
       cat(paste("\nData Generation Model - pattern", pattern, "\n"))
       

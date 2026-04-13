@@ -248,8 +248,20 @@ simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
     )
   
   
+  ## population level truth - breakpoints
+  pop.lvl.truth <- list(
+    times = times[["value"]],
+    breakpoints = breakpoints[,c("pattern", "bp.x", "bp.y")]
+  )
+  class(pop.lvl.truth) <- append("trajTruth", class(pop.lvl.truth))
+  
+  
   ## export
-  sim.data <- list(sim.dataset = sim.dataset, sim.gen.model = sim.gen.model)
+  sim.data <- list(
+    sim.dataset = sim.dataset, 
+    sim.gen.model = sim.gen.model,
+    pop.lvl.truth = pop.lvl.truth
+  )
   class(sim.data) <- append("trajData", class(sim.dataset))
   return(sim.data)
 }

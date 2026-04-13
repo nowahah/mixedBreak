@@ -18,7 +18,7 @@ plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
     scale_x_continuous(breaks = seq(0, max.time, by = 60), limits = c(0, max.time)) +
     
     labs(
-      title = paste("'True' Subjective Drug Intensity over time - pattern", pattern),
+      title = paste("Pop.-level 'True' Subjective Drug Intensity over time - pattern", pattern),
       x = "Time since drug intake (minutes)", y = "'True' SDI"
     )
 }
