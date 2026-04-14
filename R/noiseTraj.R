@@ -50,6 +50,18 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   # TODO
   # check type of entries, length
   
+  # if(length(score.sd)==1){
+  #   score.sd <- setNames(rep(score.sd, 2), c("slope","plateau"))
+  # }else if(length(score.sd)==2){
+  #   if(is.null(names(score.sd))){
+  #     names(score.sd) <- c("slope","plateau")
+  #   }else if(any(sort(names(score.sd))!=c("slope","plateau"))){
+  #     stop("Argument \'score.sd\' should have name \"slope\" and \"plateau\". \n")
+  #   }
+  # }else if(length(score.sd)>3){
+  #   stop("Argument \'score.sd\' too long (length>2). \n")
+  # }
+  
   # extract information contained in 'trueTraj' object
   breakpoints <- cbind(true.traj$breakpoints, breakpoints.sd)
   times <- list(value = true.traj$times, sd = times.sd)
@@ -69,6 +81,9 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   n.break <- nrow(breakpoints) ## nb of breakpoints
   mu <- diff(breakpoints[["bp.x"]])
   std <- breakpoints[["bp.x.sd"]][2:n.break]
+  
+  ## If we would like to simulate correlated breakpoints  
+  ## -> mvtnorm::rmvnorm
   break.x.dist <- matrix(rlnorm(n.obs * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),
                          nrow = n.break-1, dimnames = list(paste0("break.x", 1:(n.break-1)), 1:n.obs)
   )
@@ -91,15 +106,20 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
     apply(break.x.dist, 2, cumsum)
   )
   
-  # checking parameters
-  apply(break.x.value, 1, mean)
-  apply(break.x.value, 1, sd) # generally variance tends to stack because of the sum of r.v.
   
-  # simulate height / y-coordinate of breakpoints
-  break.y.value <- matrix(rnorm(n.obs * n.break, breakpoints[["bp.y"]], breakpoints[["bp.y.sd"]]),
-                          nrow = n.break, dimnames = list(paste0("break.y", 1:n.break), 1:n.obs)
+  ## simulate height / y-coordinate of breakpoints 
+  # w\ truncated normal distribution
+  slopes.i  <- which(pattern == 1) # which segments are slopes
+  n2sim <- length(slopes.i)
+  break.y.tmp <- matrix(
+    EnvStats::rnormTrunc(n.obs * n2sim, min=0, max=10,
+                         mean = breakpoints[["bp.y"]][slopes.i+1], 
+                         sd = breakpoints[["bp.y.sd"]][slopes.i+1]),
+    nrow = n2sim, dimnames = list(paste0("break.y", slopes.i), 1:n.obs)
   )
-  # force height of breakpoints after plateau
+  
+  
+  ## force height of breakpoints after plateau
   plateau.i <- which(pattern == 0) # which segments are plateaus
   if (any(pattern == 0, na.rm = T)) {
     ## warning in case of over-parametrization
@@ -116,12 +136,14 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
         "' indicates a plateau for the considered segment(s)."
       ))
     }
-    
-    # plateau overrides over-specified distribution
-    break.y.value[plateau.i + 1, ] <- break.y.value[plateau.i, ]
   }
-  break.y.value <- pmax(0, pmin(10, break.y.value))
-  break.y.value <- matrix(break.y.value, nrow = n.break)
+  ## TODO - plateau height is forced for its last breakpoint
+  ## careful to take into account all possible patterns
+  # DOESN't WORK for pattern 1010 - repair
+  break.y.value <- matrix(0, nrow = n.break, ncol = n.obs,
+                          dimnames = list(paste0("break.y", 1:n.break-1), 1:n.obs))
+  break.y.value[-c(1, 1+plateau.i),] <- break.y.tmp
+  break.y.value[plateau.i + 1, ] <- break.y.value[plateau.i, ]
   
   ## Compute slopes coefficients
   slopes <- diff(break.y.value) / diff(break.x.value)

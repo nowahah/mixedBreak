@@ -2,21 +2,21 @@
 
 # source("R/DataLoader.R")
 
-source("R/simData10.R")
+# source("R/simData10.R")
 source("R/trueTraj.R")
 source("R/noiseTraj.R")
 source("R/plot.R")
 source("R/print.R")
 
 
-# different time specifications
+# different time specifications are possible
 time.reg <- list("value" = 20, "sd" = 0) # default regular "perfect" measurement strategy
 time.noise <- list("value" = 20, "sd" = 2) # regular "perfect" measurement strategy with noise
 time.spec <- list("value" = c(0, 10, 20, 30, 40, 60, 120), "sd" = 1) # specific measurement strategy
 
-outlier.prob <- 1 / 2 # individual probability of having exactly one outlier observation
-na.prob <- 1 / 10 # measurement probability to be missing
-n.trail <- -1L # nb of trailing observations
+outlier.prob <- 1 / 2     # ind probability of having exactly one outlier 
+na.prob <- 1 / 10         # measurement probability to be missing
+n.trail <- -1L            # nb of trailing observations
 break.min.dist <- list(x = 45, y = 0) # min between-breakpoints distance
 
 n.obs <- 6L # nb of patients
@@ -46,19 +46,22 @@ break.3 <- data.frame(
 )
 
 ## TEST
-# simData10.R
-sim.data <- simData10(
-  n.obs = n.obs, score.sd = score.sd, times = time.noise,
-  breakpoints = break.4,
-  break.min.dist = break.min.dist,
-  outlier.prob = outlier.prob,
-  na.prob = na.prob,
-  n.trail = n.trail
-) 
+# # simData10.R
+# sim.data <- simData10(
+#   n.obs = n.obs, score.sd = score.sd, times = time.noise,
+#   breakpoints = break.4,
+#   break.min.dist = break.min.dist,
+#   outlier.prob = outlier.prob,
+#   na.prob = na.prob,
+#   n.trail = n.trail
+# ) 
 
 # splitted trueTraj.R & noiseTraj.R
+times <- time.noise
 breakpoints <- break.4
 true.traj <- trueTraj(times[["value"]], breakpoints[1:3])
+plot(true.traj)
+
 sim.data <- noiseTraj(true.traj, n.obs, score.sd, times.sd = times[["sd"]],
                       breakpoints.sd = breakpoints[4:5], break.x.dist = 20,
                       outlier.prob = outlier.prob, na.prob = na.prob, n.trail = 1L)
@@ -67,7 +70,6 @@ sim.data <- noiseTraj(true.traj, n.obs, score.sd, times.sd = times[["sd"]],
 
 ## Default methods for trajData objects
 # plot
-plot(true.traj)
 plot(sim.data) # default trajectory plot
 plot(sim.data, cluster = 1:4)
 plot(sim.data, cluster = 1:4, breakpoints = F)

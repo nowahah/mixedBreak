@@ -10,7 +10,7 @@ SDIpsilo <- SDIpsilo %>% filter(type %in% c("noise", "trailing") == FALSE) # rm 
 str(SDIpsilo)
 
 # focus example on a single patient
-patient <- 13
+patient <- 2
 SDIpsilo.ind <- SDIpsilo %>% filter(id == patient)
 
 # different patterns for the regression
@@ -58,11 +58,9 @@ summary(e.XPall1010)
 
 
 # exploration of break points distribution
-coeffs <- coef(e.XPall1010) %>% mutate(id = as.numeric(id))
-bp.1 <- coeffs %>% group_by(id) %>%
-  summarise(bp = first(breakpoint))
-bp.2 <- coeffs %>% group_by(id) %>%
-  summarise(bp = sort(breakpoint)[2])
-bp.3 <- coeffs %>% group_by(id) %>%
-  summarise(bp = ifelse(length(breakpoint) > 2, sort(breakpoint)[3], NA))
+coeffs <- coef(e.XPall1010) %>% mutate(id = as.numeric(id)) %>%
+  group_by(id) %>% 
+  mutate(name = paste0("bp.", row_number()))
+breaks <- coeffs %>% pivot_wider(id_cols = id, values_from = breakpoint)
+
 

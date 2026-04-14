@@ -18,7 +18,7 @@ pchs = c("signal" = 19, "noise" = 17, "trailing" = 1, "added" = 8)
 ##################################
 ## focus example on one patient ##
 ##################################
-patient = 13
+patient = 2
 SDIpsilo.ind <- SDIpsilo %>% filter(id==patient & !is.na(score))
 out.lm <- lm(score ~ 0 + time, data = SDIpsilo.ind) 
 
@@ -42,7 +42,6 @@ p <- ggplot(SDIpsilo.ind, aes(x=time, y=score, colour = type, shape = type)) +
   labs(title = paste("Subjective Drug Intensity over time for patient:", patient),
        x = "Time (minutes)", y = "SDI")
 
-p
 
 # Adding breakpoints and 95% confidence intervals
 p <- p +
@@ -51,7 +50,10 @@ p <- p +
   geom_segment(aes(x=bp.ci[1,2], y=0, xend=bp.ci[1,3], yend=0), colour = "black") +
   geom_point(aes(x=bp.ci[2,1], y=0), colour = "black", shape = 18, size=3) + # bp2
   geom_vline(xintercept = bp.ci[2,1], linetype = "dashed", colour = "grey50") +
-  geom_segment(aes(x=bp.ci[2,2], y=0, xend=bp.ci[2,3], yend=0), colour = "black")
+  geom_segment(aes(x=bp.ci[2,2], y=0, xend=bp.ci[2,3], yend=0), colour = "black") 
+  # geom_point(aes(x=bp.ci[3,1], y=0), colour = "black", shape = 18, size=3) + # bp3
+  # geom_vline(xintercept = bp.ci[3,1], linetype = "dashed", colour = "grey50") +
+  # geom_segment(aes(x=bp.ci[3,2], y=0, xend=bp.ci[3,3], yend=0), colour = "black") 
 
 p
 
@@ -84,7 +86,7 @@ plot.segmented(o, conf.level=.95, res=T, ylim = c(0,12),
 #      main = "Residuals against fitted values")
 
 
-# facet graph
+# facet graph of SDIpsilo data
 ggplot(data = SDIpsilo, mapping = aes(x=time, y=score, colour=type, shape=type)) +
   geom_point() +
   facet_wrap(~id, nrow = 4) +
