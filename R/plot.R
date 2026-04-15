@@ -1,9 +1,5 @@
-
-plot <- function(object){
-  UseMethod("plot")
-}
-
 ## Method for object of class 'trajTruth'
+##' @export
 plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
                            alpha = .65, true.color = "green4"){
   require(ggplot2)
@@ -28,6 +24,7 @@ plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
 
 ## Method for object of class 'trajData'
 # graphical review of simulated dataset
+##' @export
 plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
                           cluster = 1:nrow(sim.data$sim.dataset),
                           alpha = .65, true.color = "green4") {

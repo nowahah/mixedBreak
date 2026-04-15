@@ -27,6 +27,7 @@
 ##' and other characteristics such as outlier or missing value flag
 
 
+##' @export
 trueTraj <- function(times = 20L, breakpoints = NULL){
 
   traj.truth <- list(times = times, breakpoints = breakpoints)
