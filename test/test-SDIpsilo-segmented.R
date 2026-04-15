@@ -18,7 +18,7 @@ pchs = c("signal" = 19, "noise" = 17, "trailing" = 1, "added" = 8)
 ##################################
 ## focus example on one patient ##
 ##################################
-patient = 2
+patient = 3
 SDIpsilo.ind <- SDIpsilo %>% filter(id==patient & !is.na(score))
 out.lm <- lm(score ~ 0 + time, data = SDIpsilo.ind) 
 
@@ -57,7 +57,16 @@ p <- p +
 
 p
 
-# Adding model's fit and confidence intervals
+
+## Evaluate breakpoints' CI overlapping
+# for every breakpoint
+bp.ci[2,3] > max(o$model$time) # overlaps with right-end of time domain
+bp.ci[1,2] < min(o$model$time) # overlaps with left-end of time domain
+# for every two consecutive breakpoints 
+bp.ci[1,3] > bp.ci[2,2] # are CI of consecutive breaks overlapping ? loop over 1:(n.break-1)
+
+
+## TODO Adding model's fit and confidence intervals
 # TODO for CI
 p +
   geom_segment(aes(x=bp.ci[1,1], y=predict(o, data.frame(time = bp.ci[1,1])),
@@ -74,7 +83,7 @@ plot.segmented(o, conf.level=.95, res=T, ylim = c(0,12),
                res.col = cols[SDIpsilo.ind$type],
                ylab = "SDI", xlab = "Time (minutes)", 
                main = paste("Subjective Drug Intensity over time for patient:", patient))
-
+summary(o)
 
 # # residuals over time
 # plot(SDIpsilo.ind$time[!is.na(SDIpsilo.ind$score)], o$residuals,
@@ -85,18 +94,3 @@ plot.segmented(o, conf.level=.95, res=T, ylim = c(0,12),
 #      xlab = "Fitted values (SDI)", ylab = "Residuals", 
 #      main = "Residuals against fitted values")
 
-
-# facet graph of SDIpsilo data
-ggplot(data = SDIpsilo, mapping = aes(x=time, y=score, colour=type, shape=type)) +
-  geom_point() +
-  facet_wrap(~id, nrow = 4) +
-  
-  # custom x, y ticks and points shapes and colors
-  scale_x_continuous(breaks = seq(0,max.time, by=40), limits = c(0,max.time)) + 
-  scale_y_continuous(breaks = 0:10, limits = c(0, 10)) + # custom y ticks
-  scale_color_manual(values = cols) + # custom point colors according to measurment type
-  scale_shape_manual(values = pchs) + # same but for shape
-  
-  # labels
-  labs(title = "Subjective Drug Intensity over time for all patients",
-       x = "Time (minutes)", y = "SDI")
