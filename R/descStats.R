@@ -62,7 +62,7 @@ ggplot(data = SDIpsilo, mapping = aes(x=time, y=score.diff1)) +
 # plateaus: diff is null, up to a single non-zeros value
 
 ## ALGORITHM:
-# isolate:
+# To roughly estimate breakpoints, we could split the trajectory by isolating:
 #   - onset phase: longest positive/increasing segment
 #   - plateau: longest null/constant segment, up to single non-zero value
 #   - offset phase: longest negative/decreasing segment
@@ -82,7 +82,7 @@ ggplot(SDIpsilo, aes(x=score)) +
              position = position_stack(vjust = 0.5)) +
   
   # custom x ticks 
-  scale_x_continuous(breaks = seq(0,10, by=1), limits = c(-.5, 10.5)) + # custom x ticks
+  scale_x_continuous(breaks = seq(0,10, by=1)) + # custom x ticks
 
   # labels
   labs(title = "Subjective Drug Intensity histogram for all patients",
@@ -105,4 +105,4 @@ ggplot(SDIpsilo, aes(x=score)) +
   labs(title = "Subjective Drug Intensity histogram for every patients",
        x = "SDI score", y = "Count")
 # most patient we could assume they either peak of trail at the mode of their 
-# discrete distribution. The distinction could be mad simply by the value of the mode
+# discrete distribution. The distinction could be made simply by the value of the mode

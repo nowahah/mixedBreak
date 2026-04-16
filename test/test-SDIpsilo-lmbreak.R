@@ -41,7 +41,7 @@ e.XPall1010 <- mlmbreak(score ~ 0 + bp(time, c("1010", "101", "11")),
   cluster = "id",
   data = SDIpsilo, trace = FALSE
 )
-plot(e.XPall101, linewidth = 0, breakpoint = F)
+plot(e.XPall101)
 plot(e.XPall1010) # doing 1010 then 101 if no convergence seems appropriate
 plot(e.XPall1010, ylim = c(0, 10), cluster = 2:4) # focus on some clusters
 
@@ -50,10 +50,10 @@ summary(e.XPall1010)
 
 # Breakpoints:
 # id pattern   cv continuity        R2                     breakpoint      maxVs
-# 1    1010 TRUE       TRUE 0.9892315 84.50704, 175.78947, 274.03509    < 1e-07
-# 2    1010 TRUE       TRUE 0.9916394  55.55743, 92.50575, 232.49985 0.00025244
-# 3     101 TRUE       TRUE 0.9915031            65.14286, 166.48148    < 1e-07
-# 4    1010 TRUE       TRUE 0.9897900   100.4808, 230.0000, 311.6667    < 1e-07
+#  1    1010 TRUE       TRUE 0.9892315 84.50704, 175.78947, 274.03509    < 1e-07
+#  2    1010 TRUE       TRUE 0.9916394  55.55743, 92.50575, 232.49985 0.00025244
+#  3     101 TRUE       TRUE 0.9915031            65.14286, 166.48148    < 1e-07
+#  4    1010 TRUE       TRUE 0.9897900   100.4808, 230.0000, 311.6667    < 1e-07
 # ...
 
 

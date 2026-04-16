@@ -5,7 +5,7 @@ plot <- function(object){
 
 ## Method for object of class 'trajTruth'
 plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
-                           alpha = .65, true.color = "green4"){
+                           alpha = .65, true.color = "orange2"){
   require(ggplot2)
   
   max.time <- max(true.traj$breakpoints$bp.x)
