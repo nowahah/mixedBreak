@@ -45,10 +45,10 @@ for(id in levels(SDIpsilo$id)){
 sum(sqrt((slopes.lmb[,1]-slopes.seg[,1])^2)) # 0.03878301
 # corrplot(cor(slopes.lmb), method = "ellipse", type = "upper", diag = F) 
 cor(slopes.lmb) # 0.3297237
+cor(slopes.seg) # 0.2474174 - more moderate
 
 # offset slopes
 sum(sqrt((slopes.lmb[,2]-slopes.seg[,2])^2)) # 0.01180891
-cor(slopes.seg) # 0.2474174 - more moderate
 
 # break 1 coordinates
 plot(breaks.lmb[,1] - breaks.seg[,1], pch = 18, xlab = "Patient id",
@@ -59,9 +59,9 @@ abline(h=0, lty="dashed")
 plot(breaks.lmb[,2] - breaks.seg[,2], pch = 18, xlab = "Patient id",
      main = "Difference in breakpoint 1 height estimates", ylab = "relative difference") 
 abline(h=0, lty="dashed")
-# idem except on 15
+# same except for 15
 
-cor(breaks.lmb)
+cor(breaks.lmb) # interpretation ?
 
 
 # break 2 coordinates

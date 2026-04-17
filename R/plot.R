@@ -7,10 +7,25 @@ plot <- function(object){
 plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
                            alpha = .65, true.color = "orange2"){
   require(ggplot2)
+  require(dplyr)
   
   max.time <- max(true.traj$breakpoints$bp.x)
   pattern <- true.traj$breakpoints$pattern
   pattern <- paste(pattern[!is.na(pattern)], collapse = "")
+  
+  # ## TODO - theoretical measurements points
+  # if (length(true.traj$times)==1){
+  #   time <- seq(0, max.time+true.traj$times, by = true.traj$times)
+  # } else if (length(true.traj$times>1){
+  #   time <- times$value
+  # }
+  # time.point <- data.frame(
+  #   time = c(time, true.traj$breakpoints$bp.x),
+  #   seg.lim = c(rep(F, length(time)), rep(T, length(true.traj$breakpoints$bp.x)))
+  # ) %>%
+  # arrange(time, -seg.lim)
+  
+  
   ggplot(true.traj$breakpoints, mapping = aes(x=bp.x, y=bp.y)) +
     geom_line(colour = true.color, alpha = alpha) + 
     geom_point(colour = true.color, alpha = alpha, shape = 18, size = 3) +

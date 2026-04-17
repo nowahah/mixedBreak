@@ -137,9 +137,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
       ))
     }
   }
-  ## TODO - plateau height is forced for its last breakpoint
-  ## careful to take into account all possible patterns
-  # DOESN't WORK for pattern 1010 - repair
+  ## plateau height is forced for its ending breakpoint
   break.y.value <- matrix(0, nrow = n.break, ncol = n.obs,
                           dimnames = list(paste0("break.y", 1:n.break-1), 1:n.obs))
   break.y.value[-c(1, 1+plateau.i),] <- break.y.tmp

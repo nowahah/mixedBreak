@@ -17,11 +17,12 @@ ggplot(data = basel, mapping = aes(x=time.num, y=score, colour=Study)) +
        x = "Time since drug intake (minutes)", y = "Feeling on Visual Analog Scale (0-100)")
 
 ## Basel psilo
+max.time <- basel %>% filter(Study=="SPS" & !is.na(score)) %>% summarise(max(time.num))
 ggplot(data = basel %>% filter(Study=="SPS"), mapping = aes(x=time.num, y=score, colour=Study)) +
   geom_point() + facet_wrap(~ID) +
   
   # custom x y ticks 
-  scale_x_continuous(breaks = seq(0,420,by=60), limits = c(0, 420)) + # custom x ticks for SPS
+  scale_x_continuous(breaks = seq(0,max.time[[1]],by=60), limits = c(0, max.time[[1]])) + # custom x ticks for SPS
   scale_y_continuous(breaks = seq(0,100,by=25), limits = c(0, 100)) + # custom y ticks
   
   # labels
