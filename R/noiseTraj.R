@@ -40,6 +40,7 @@
 ##' }
 
 
+##' @export
 noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
                       breakpoints.sd = NULL, break.x.dist = 0,
                       outlier.prob = 0, na.prob = 0, n.trail = 0L){

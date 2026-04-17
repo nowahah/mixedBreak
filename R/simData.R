@@ -18,7 +18,7 @@
 ##' @param plateau [named list] named list with \itemize{
 ##' \item "value" for the height / altitude of the plateau (e.g. its 'y' coordinate).
 ##' \item "value.sd" for the noise level of height of plateau.
-##' It is *highly recommended* to specify plateau's height given its constraint (\leq 10),
+##' It is *highly recommended* to specify plateau's height given its constraint (\eqn{\leq 10}),
 ##' to avoid any unintended re-computation of \code{b.onset} or \code{break.1}. 
 ##' They would then not match the pre-specified distribution for those parameters.
 ##' \item "duration" for the duration of the plateau on the same time scale as \code{times}.
@@ -61,6 +61,7 @@
 ##' and other characteristics such as outlier or missing value flag
 
 
+##' @export
 simData <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
                     plateau = list("value" = 9, "value.sd" = 3,
                                    "duration" = 82.4, "duration.sd" = 33.1), 

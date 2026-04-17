@@ -50,7 +50,7 @@
 ##' It contains ID, time of measurements, Data Generation Model, simulated measurements
 ##' and other characteristics such as outlier or missing value flag
 
-
+##' @export
 simData10 <- function(n.obs, score.sd, times = list("value" = 20, "sd" = 0),
                       breakpoints = NULL, break.min.dist = list(x = 0, y = NA),
                       outlier.prob = 0, na.prob = 0, n.trail = 0L) {

@@ -2,12 +2,13 @@ Package: mixedBreak
 Type: Package
 Title: Linear Regression with Unknown Breakpoints
 Version: 0.1.0
-Date: 2026-04-14
+Date: 2026-04-15
 Authors@R: c(
-    person("Noah", "Degoulange", role = c("aut", "cre"), email = "noah.degoulange@gmail.com", comment = c(ORCID = "None"))
+    person("Noah", "Degoulange", role = c("aut", "cre"), email = "noah.degoulange@gmail.com")
 	)
 Description: Fit linear regression with unknown breakpoints. 
 License: GPL-3
 Encoding: UTF-8
 URL: https://github.com/nowahah/mixedBreak
+Depends: R (>= 4.1.0),
 RoxygenNote: 7.3.3

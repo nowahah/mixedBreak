@@ -1,3 +1,4 @@
+##' @export
 subset.trajData <- function(x, observed = TRUE, default = FALSE, subset = NULL){
   if(default){
     subset.data.frame(x, subset = subset)

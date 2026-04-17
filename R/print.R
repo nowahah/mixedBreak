@@ -1,10 +1,12 @@
 ## Method for object of class 'trajTruth'
+##' @export
 print.trajTruth <- function(true.traj){
   print.data.frame(true.traj)
 }
 
 
 ## Method for object of class 'trajData'
+##' @export
 print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
                            cluster = levels(sim.data$sim.dataset$ID)){
   if(default){
