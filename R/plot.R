@@ -41,7 +41,7 @@ plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
 # graphical review of simulated dataset
 ##' @export
 plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
-                          cluster = 1:nrow(sim.data$sim.dataset),
+                          cluster = levels(sim.data$sim.dataset$ID),
                           alpha = .65, true.color = "green4") {
   require(ggplot2)
   require(dplyr)
@@ -82,7 +82,7 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   # breakpoints coordinates
   break.data <- sim.data$sim.gen.model %>%
     filter(ID %in% cluster) %>%
-    select(-starts_with("beta.")) %>%
+    dplyr::select(-starts_with("beta.")) %>%
     pivot_longer(cols = starts_with("break.x"), names_to = "break.x", values_to = "x.coord") %>%
     pivot_longer(cols = starts_with("break.y"), names_to = "break.y", values_to = "y.coord") %>%
     filter(str_sub(break.x, -1L) == str_sub(break.y, -1L))

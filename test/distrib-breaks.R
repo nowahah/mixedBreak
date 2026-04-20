@@ -8,11 +8,13 @@ library(MASS)
 # TODO - truncated ??
 n.obs <- 10000L
 peak <- 9
-mu = c(71*peak/10, peak) # 71 min if plateau at 10 SDI (ie beta.onset = 10/71 = 0.141)
-sd.x <- 20
-sd.y <- 3
-rho <- mu[2]/mu[1]*sd.x/sd.y
-# rho <- beta.onset * sd.x/sd.y
+beta.onset <- 10/71 # 71 min if plateau at 10 SDI
+mu = c(peak/beta.onset, peak) 
+sd.x <- sqrt(33) # study value is 33, this one is for showing the correlation strategy only
+sd.y <- 1
+rho <- beta.onset*sd.x/sd.y # positive correlation condition
+# TODO CHECK negative correlation
+# rho <- -beta.onset*sd.x/sd.y # correlation < 0 condition (orthogonal line, higher ratio variance)
 # rho <- .75 # arbitrary value
 ## condition for specifying correlation so ratio y/x has mean beta.target
 if(rho > 1 | rho < -1){
@@ -28,7 +30,7 @@ ggplot(gen.norm, aes(x=x, y=y)) +
   stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white") +
   
   # Adding reference slope
-  geom_abline(slope = 1.4/10) +
+  geom_abline(slope = 1.4/10, colour = "white") +
   geom_abline(slope = rho*sd.y/sd.x, intercept = mu[2]-mu[1]*rho*sd.y/sd.x,
               linetype="dashed", color = "red") +
   
@@ -46,9 +48,11 @@ ggplot(gen.norm, aes(x=x, y=y)) +
 # bcs expression with sgn(rho) replaced by rho is BLUP of y given x"
 # CONCLUSIONS:
 # Considering the expression, the correlation strategy could be successfully applied iff:
-# sd.y/sd.x > beta.onset OR
+# sd.y/sd.x > beta.onset (easier to check and interpret) OR
 # (mu.y/mu.x) * (sd.x/sd.y) \in [-1;1]
 # which typically is not the case given observed simulation (sd.x=33, sd.y=??)
+# Could possibly try and save the day by considering orthogonal line passing through
+# the point with negative correlation
 
 
 ## onset slope density plot
@@ -65,5 +69,47 @@ ggplot(gen.norm, aes(x=y/x)) +
        x = "Onset slope value", y = "Density value")
 
 
-## TODO - Relationship between correlation and beta values BLUP of y given x
-# y(x) = rho*(sd.y/sd.x)*(x-mu.x) + mu.y
+################################################################################
+
+## Needs a trajData object in sim.data
+
+## density plots (need enough observations to be beautiful - and meaningful)
+# slope up VS down
+ggplot(sim.data$sim.gen.model, aes(x=beta.1, y=beta.3)) +
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white") +
+  geom_point(alpha=0)
+cor.test(sim.data$sim.gen.model$beta.1,sim.data$sim.gen.model$beta.3)
+
+# library(ggExtra) 3 marginal density plots
+# ggMarginal(p, type = "density", fill = "transparent") # not so good - p<-previous_graph
+
+# break 1/2/3 (x, y) coordinates - one at a time
+ggplot(sim.data$sim.gen.model, aes(x=break.x1, y=break.y1)) +
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white") 
+
+
+# all breakpoints (x, y) densities
+ggplot(sim.data$sim.gen.model, aes(x=break.x1, y=break.y1), alpha=.5) +
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="gray10") +
+  stat_density_2d(aes(x=break.x2, y=break.y2, fill = after_stat(level), alpha=.5), 
+                  geom = "polygon", colour="gray10") +
+  stat_density_2d(aes(x=break.x3, y=break.y3, fill = after_stat(level), alpha=.5), 
+                  geom = "polygon", colour="gray10") +
+  
+  # color customization
+  scale_fill_distiller(palette = "Purples", direction = 1) +
+  
+  # custom limits and ticks
+  scale_x_continuous(breaks = seq(0, 500, by=60), limits = c(0, 500)) + # custom x ticks for SPS
+  scale_y_continuous(breaks = seq(0, 10, by=2), limits = c(0, 10)) + # custom y ticks
+  
+  # labels
+  labs(title = "Breakpoints' density plot (independent coordinates)",
+       x = "Time since drug intake (minutes)", y = "SDI scale")
+
+# gradient scale is poorly adjusted due to heterogeneous variances
+
+
+## OBSERVATIONS
+# Here we can assess well the escalation in variation due to modelling
+# the distances and summing independent r.v.

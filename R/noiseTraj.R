@@ -76,8 +76,6 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
     n.trail <- -1L 
   }
   
-  ## normalize parametrization of trajectories
-  # TODO
   
   ## simulate between-breakpoints distances to compute coordinates
   n.break <- nrow(breakpoints) ## nb of breakpoints
@@ -149,9 +147,9 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   slopes <- diff(break.y.value) / diff(break.x.value)
   slopes.i <- which(pattern == 1)
   slopes <- slopes[slopes.i, ] # remove plateau(s) (slope=0)
-  slopes <- as.data.frame(t(slopes))
+  slopes <- as.data.frame(matrix(slopes, nrow = n.obs, byrow = T))
   names(slopes) <- paste0("beta.", slopes.i)
-  
+
   ## Compute ending time of trajectories
   ending.times <- break.x.value[n.break, ]
   max.time <- max(ending.times)
@@ -189,6 +187,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
     ID = as.factor(1:n.obs)
   )
   # add breakpoints coordinates
+  ## changed to t(slopes for single slopes case, might bug for other patterns)
   sim.gen.model <- cbind(sim.gen.model, t(break.x.value), t(break.y.value), slopes)
   names(sim.gen.model)[1+1:(2*n.break)] <- paste0(
     rep("break", n.break),
@@ -198,7 +197,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   # compute segments number
   sim.dataset <- sim.dataset %>%
     left_join(sim.gen.model %>%
-                select(c(1, starts_with("break."))), by = "ID") %>%
+                dplyr::select(c(1, starts_with("break."))), by = "ID") %>%
     rowwise() %>% # row-wise cut on time against break x-values
     mutate(
       segment = cut(time,
@@ -226,7 +225,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
       )
     ) %>%
     ungroup() %>%
-    select(-c(name, value, x1, x2, y1, y2)) %>%
+    dplyr::select(-c(name, value, x1, x2, y1, y2)) %>%
     distinct()
   
   
