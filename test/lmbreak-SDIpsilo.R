@@ -14,12 +14,12 @@ e.XPall101 <- mlmbreak(score ~ 0 + bp(time, "101"),
   cluster = "id",
   data = SDIpsilo, trace = FALSE
 )
-# e.XPall1010 <- mlmbreak(score ~ 0 + bp(time, c("1010", "101", "11")),
-#   cluster = "id",
-#   data = SDIpsilo, trace = FALSE
-# )
+e.XPall1010 <- mlmbreak(score ~ 0 + bp(time, c("1010", "101", "11")),
+  cluster = "id",
+  data = SDIpsilo, trace = FALSE
+)
 plot(e.XPall101)
-# plot(e.XPall1010) # doing 1010 then 101 if no convergence seems appropriate
+plot(e.XPall1010) # doing 1010 then 101 if no convergence seems appropriate
 
 summary(e.XPall101)
 # summary(e.XPall1010)

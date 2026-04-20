@@ -42,7 +42,7 @@
 
 ##' @export
 noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
-                      breakpoints.sd = NULL, break.x.dist = 0,
+                      breakpoints.sd = NULL, break.min.dist = list(x=20, y=NA),
                       outlier.prob = 0, na.prob = 0, n.trail = 0L){
   require(dplyr)
   require(tidyr)
@@ -51,17 +51,18 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   # TODO
   # check type of entries, length
   
-  # if(length(score.sd)==1){
-  #   score.sd <- setNames(rep(score.sd, 2), c("slope","plateau"))
-  # }else if(length(score.sd)==2){
-  #   if(is.null(names(score.sd))){
-  #     names(score.sd) <- c("slope","plateau")
-  #   }else if(any(sort(names(score.sd))!=c("slope","plateau"))){
-  #     stop("Argument \'score.sd\' should have name \"slope\" and \"plateau\". \n")
-  #   }
-  # }else if(length(score.sd)>3){
-  #   stop("Argument \'score.sd\' too long (length>2). \n")
-  # }
+  # CHECK score.sd
+  if(length(score.sd)==1){
+    score.sd <- setNames(rep(score.sd, 2), c("slope","plateau"))
+  }else if(length(score.sd)==2){
+    if(is.null(names(score.sd))){
+      names(score.sd) <- c("slope","plateau")
+    }else if(any(sort(names(score.sd))!=c("plateau","slope"))){
+      stop("Argument \'score.sd\' should have name \"slope\" and \"plateau\". \n")
+    }
+  }else if(length(score.sd)>3){
+    stop("Argument \'score.sd\' too long (length>2). \n")
+  }
   
   # extract information contained in 'trueTraj' object
   breakpoints <- cbind(true.traj$breakpoints, breakpoints.sd)
@@ -83,10 +84,10 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   mu <- diff(breakpoints[["bp.x"]])
   std <- breakpoints[["bp.x.sd"]][2:n.break]
   
-  ## If we would like to simulate correlated breakpoints  
-  ## -> mvtnorm::rmvnorm
-  break.x.dist <- matrix(rlnorm(n.obs * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),
-                         nrow = n.break-1, dimnames = list(paste0("break.x", 1:(n.break-1)), 1:n.obs)
+  ## If we would like to simulate correlated breakpoints -> mvtnorm::rmvnorm
+  break.x.dist <- matrix(
+    rlnorm(n.obs * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),
+    nrow = n.break-1, dimnames = list(paste0("break.x", 1:(n.break-1)), 1:n.obs)
   )
   
   ## check distance validity - bounded by break.min.dist$x
@@ -230,9 +231,23 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   
   
   # Adding noised and measured trajectories (integer-round)
+  # sim.dataset <- sim.dataset %>%
+  #   mutate(
+  #     noised.traj = true.traj + rnorm(n(), sd = score.sd),
+  #     # rounded score, including trailing observations
+  #     score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step, 
+  #                     pmin(10, pmax(0, round(noised.traj))), NA)
+  #     # trailing is checked bcs due to noise on time of measurements, the nb of trailing may change
+  #     # TODO - should trailling be noised as well ?
+  #   )
   sim.dataset <- sim.dataset %>%
     mutate(
-      noised.traj = true.traj + rnorm(n(), sd = score.sd),
+      # level of noise depends on plateau/slope
+      noised.traj = if_else(
+        !pattern | is.na(pattern),
+        true.traj + rnorm(n(), sd = score.sd[["plateau"]]),
+        true.traj + rnorm(n(), sd = score.sd[["slope"]])
+      ),
       # rounded score, including trailing observations
       score = if_else(time < ending.times[ID] + (1 + n.trail) * time.step, 
                       pmin(10, pmax(0, round(noised.traj))), NA)
@@ -242,11 +257,10 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   
   
   ## Adding outliers - patient went to the bathroom
-  # Can happen at most once per patient
   sim.dataset <- sim.dataset %>%
     group_by(ID) %>%
     mutate(
-      # outliers location and draft
+      # outliers random draft - at most once per patient/ID
       outliers = (row_number() == sample.int(n(), 1)) * rbinom(n(), 1, outlier.prob) == 1,
       # outliers is a drop in truth of 1-3 points (still bounded 0<=score<=10)
       score = pmin(10, pmax(0, score - sample(1:3, 1, prob = c(1, 4, 4)) * outliers)),
