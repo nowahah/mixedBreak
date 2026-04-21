@@ -10,15 +10,21 @@ n.obs <- 10000L
 peak <- 9
 beta.onset <- 10/71 # 71 min if plateau at 10 SDI
 mu = c(peak/beta.onset, peak) 
-sd.x <- sqrt(33) # study value is 33, this one is for showing the correlation strategy only
+sd.x <- 33 # study value is 33, this one is for showing the correlation strategy only
 sd.y <- 1
 rho <- beta.onset*sd.x/sd.y # positive correlation condition
-# TODO CHECK negative correlation
-# rho <- -beta.onset*sd.x/sd.y # correlation < 0 condition (orthogonal line, higher ratio variance)
-# rho <- .75 # arbitrary value
+# TODO CHECK negative correlation shift
+rho <- -beta.onset*sd.y/sd.x # correlation < 0 condition (orthogonal line, higher ratio variance)
+rho <- -1 # arbitrary value
 ## condition for specifying correlation so ratio y/x has mean beta.target
 if(rho > 1 | rho < -1){
-  stop(paste0("Variance parameters forces rho outside of range [-1;1] (rho = ", round(rho,2), ")"))
+  warning(paste0("Variance parameters forces rho outside of range [-1;1] (rho = ", round(rho,2), ")"))
+  if(rho > 1) {
+    rho <- 1
+  }else if (rho < -1){
+    rho <- -1
+  }
+  warning(paste("rho set to", rho, "instead of", round(beta.onset*sd.x/sd.y, 2)))
 }
 
 cor.mat <- matrix(c(sd.x^2, rho*sd.x*sd.y, rho*sd.x*sd.y, sd.y^2), ncol=2)
@@ -30,16 +36,16 @@ ggplot(gen.norm, aes(x=x, y=y)) +
   stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", colour="white") +
   
   # Adding reference slope
-  geom_abline(slope = 1.4/10, colour = "white") +
+  geom_abline(slope = 1.4/10, colour = "black") +
   geom_abline(slope = rho*sd.y/sd.x, intercept = mu[2]-mu[1]*rho*sd.y/sd.x,
               linetype="dashed", color = "red") +
   
   # custom limits and ticks
-  scale_x_continuous(breaks = seq(0, 100, by=20), limits = c(0, 100)) + # custom x ticks (SPS)
-  scale_y_continuous(breaks = seq(0, 12, by=2), limits = c(0, 12)) + # custom y ticks
+  scale_x_continuous(breaks = seq(0, 120, by=20), limits = c(0, 120)) + # custom x ticks (SPS)
+  scale_y_continuous(breaks = seq(0, 12, by=2), limits = c(6, 12)) + # custom y ticks
   
   # labels
-  labs(title = "Breakpoints' density plot (independent coordinates)",
+  labs(title = paste0("Breakpoints' density plot (correlation = ", round(rho, 2),")"),
        x = "Time since drug intake (minutes)", y = "SDI scale")
 
 # see https://en.wikipedia.org/wiki/Multivariate_normal_distribution
@@ -66,8 +72,13 @@ ggplot(gen.norm, aes(x=y/x)) +
   
   # labels
   labs(title = paste("Onset slope density plot - (x,y) ~ MVN with correlation =", round(rho,2)),
+       subtitle = paste("mean =", round(mean(gen.norm$y/gen.norm$x), 4),
+                        "; sd =", round(sd(gen.norm$y/gen.norm$x), 4)),
        x = "Onset slope value", y = "Density value")
 
+
+## TODO - Simulated multiple datasets to assess average value of ratio 
+# (un)biased whenever we met (or not) the conditions on sd ratio
 
 ################################################################################
 
