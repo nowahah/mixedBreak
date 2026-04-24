@@ -1,6 +1,7 @@
 library(lmbreak)
 library(segmented)
 library(corrplot)
+library(ggplot2)
 
 data("SDIpsilo")
 SDIpsilo$type <- as.factor(SDIpsilo$type)
@@ -38,6 +39,7 @@ for(id in levels(SDIpsilo$id)){
   breaks.seg[id, 1+2*0:(n.breaks-1)] <- mod.seg$psi[,2] # time coord
   slopes.seg[id,] <- mod.seg$coefficients[1:n.breaks] # slopes
   breaks.seg[id, 2*1:n.breaks] <- slopes.seg[id,1]*breaks.seg[id,1] # intercept
+  confint(mod.seg) # breaks CI
 }
 
 ## Comparison
@@ -86,9 +88,13 @@ p +
     aes(x=x, y=y), 
     data=data.frame(
       # id label is not exact if cv != TRUE, TRUE - ok for 2, 7, 8
-      id=as.factor(paste(rep(cluster,2), "(cv = TRUE,TRUE)")),
+      id=as.factor(
+        paste0(rep(cluster,2), " (cv = ", 
+               unlist(lapply(mod.lmb$opt, function(x) x['cv']), use.names = F),",",
+               unlist(lapply(mod.lmb$opt, function(x) x['continuity']), use.names = F), ")")
+        ),
       x=c(breaks.seg[cluster,c(1,3)]),
       y=c(breaks.seg[cluster,c(2,4)])
     ), shape=18, size=3, color="blue"
   )
-
+# same for 11, 15
