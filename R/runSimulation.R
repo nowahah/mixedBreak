@@ -37,36 +37,46 @@ allseeds <- sample.int(n = .Machine$integer.max, size = nsimAll, replace=FALSE)
 # scenarios dataset
 scenarios <- data.frame(
   scenarID = 1:n.scenario,
-  break.x1 = NA,
-  break.x1.sd = NA,
-  break.y1 = NA,
-  break.y1.sd = NA,
-  break.x2 = NA,
-  break.x2.sd = NA
+  break.x1 = NA_real_,
+  break.x1.sd = NA_real_,
+  break.y1 = NA_real_,
+  break.y1.sd = NA_real_,
+  break.x2 = NA_real_,
+  break.x2.sd = NA_real_,
+  score.sd = NA # only for the slopes ? if plateau variance does not change
 )
 
 # true values datasets
 true.parameters <- data.frame(
+  scenarID = rep(1:n.scenario, times = n.sim*n.obs),
   simID = rep(1:nsimAll, times = rep(n.obs, each=n.sim)),
-  patientID = NA_integer_,
+  patientID = sequence(rep(n.obs, each=n.sim)),
   break.x1 = NA_real_,
+  break.x1.sd = NA_real_,
   break.y1 = NA_real_
 )
 
 # TODO estimates dataset
 estimates.seglme <- data.frame(
   simID = rep(1:nsimAll, times = rep(n.obs, each=n.sim)),
-  patientID = NA_integer_,
+  patientID = sequence(rep(n.obs, each=n.sim)),
+  break.avg = NA_real_,
   break.x1 = NA_real_,
+  break.x1.sd = NA_real_,
   break.y1 = NA_real_,
+  breaks.CI95.low = NA_real_,
+  breaks.CI95.up = NA_real_,
+  intercept = NA_real_,
   error = NA
 )
+# TODO - update fields
 estimates.segreg <- data.frame(
   simID = rep(1:nsimAll, times = rep(n.obs, each=n.sim)),
-  patientID = NA_integer_,
+  patientID = sequence(rep(n.obs, each=n.sim)),
   break.x1 = NA_real_,
+  break.x1.sd = NA_real_,
   break.y1 = NA_real_,
-  error = NA
+  error = NA_character_
 )
 
 
@@ -74,9 +84,8 @@ estimates.segreg <- data.frame(
 
 ## FIRST LOOP on sample size
 start.time <- Sys.time()
-sim.nb = 1 # iterator count
+sim.nb = 0 # iterator count
 for (n.patients in n.obs){
-
 
   ## Scenario set up
   break.3 <- data.frame(
@@ -89,10 +98,16 @@ for (n.patients in n.obs){
   true.traj <- trueTraj(times[["value"]], break.3[1:3])
 
   ## REP LOOP on repetitions
-  for (j in 1:n.sim){
-
+  for (jj in 1:n.sim){
+    
+    ## increment
+    sim.nb = sim.nb + 1
+    
+    # # debug
+    # if (sim.nb!=11) next
+    
     ## 0. update 'progress bar' information
-    if (sim.nb %% 10 == 0){ print(paste(sim.nb, "/", nsimAll)) }
+    if (sim.nb %% 1 == 0){ print(paste(sim.nb, "/", nsimAll)) }
 
     ## 1. set seed
     set.seed(allseeds[sim.nb])
@@ -109,8 +124,9 @@ for (n.patients in n.obs){
       n.trail = n.trail
     )
     
-    true.parameters[true.parameters$simID == sim.nb,2:4] <- 
+    true.parameters[true.parameters$simID == sim.nb, c(3,4,6)] <- 
       sim.data$sim.gen.model[,c("ID", "break.x1", "break.y1")]
+    true.parameters[true.parameters$simID == sim.nb, 5] <- NA
       
 
     ## 3. evaluate models
@@ -132,33 +148,42 @@ for (n.patients in n.obs){
         
       },
       error = function(e){ 
-        estimates[sim.nb, 'error'] <- e
+        print("Error during estimation of 'segmented.lme' model.")
+        # browser()
+        estimates.seglme[sim.nb, 'error'] <<- e$message # error assignement is incorrect
       }
     )
     
     #  3.2. segmented (with apply)
     tryCatch(
       {
-        mod.seg <- segreg(
-          score ~  0 + seg(time, npsi=1, est=c(1,0)), 
-          data = sim.data$sim.dataset
-        )
+        # mod.seg <- segreg(
+        #   score ~  0 + seg(time, npsi=1, est=c(1,0)), 
+        #   data = sim.data$sim.dataset
+        # )
+        
+        mod.seg <- sim.data$sim.dataset %>% 
+          group_by(ID) %>% 
+          mutate(model = list(segreg(score ~  0 + seg(time, npsi = 1, est = c(1,0)), 
+                                     data=pick(everything())))) %>%
+          select(ID, model) %>%
+          distinct()
         
       },
       error = function(e){ 
         print("Error during estimation of 'segreg' model.")
-        print(e)
+        # browser()
+        estimates.segreg[sim.nb, 'error'] <<- paste(c(e$body, e$parent$message), 
+                                                    collapse=" ==> ")
       }
     )
     
 
     ## 4. store results / errors
-    if(!is.na(estimates[sim.nb, 'error'])){
+    if(!is.na(estimates.seglme[sim.nb, 'error'])){
       # store results
     }
     
-    ## increment
-    sim.nb = sim.nb + 1
   }
   # END REP LOOP
 
@@ -167,11 +192,12 @@ for (n.patients in n.obs){
 
 }
 # END
+ending.seed <- .Random.seed
 end.time <- Sys.time()
 print("Simulation study lasted for:")
-end.time-start.time
+print(end.time-start.time)
 print("Average time/iteration:")
-(end.time-start.time)/nsimAll
-print("Estimated simulation study duration in hours:")
-(end.time-start.time)/nsimAll*11000/60
+print((end.time-start.time)/nsimAll)
+print("Estimated simulation study duration (in hours):")
+print((end.time-start.time)/nsimAll*9500/60)
 # Estimated 17.37 h of simulation

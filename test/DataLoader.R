@@ -15,7 +15,7 @@ basel$PatientID <- as.factor(basel$PatientID)
 basel$time.num <- as.numeric(as.character(basel$time))
 names(basel)[2] = "ID"
 
-## ** load NRU Psilo dataset
+## ** load NRU Psilo dataset (same file, sheet n2)
 dtW <- as.data.table(read_excel("../lmbreak/source/SDI_Psilo_22.11.2023.xlsx", sheet = "Psilo NRU"))
 SDIpsilo.ext <- dtW[, c("CIMBI ID", "Time (min) elapsed since drug administration", "SDI score")]
 names(SDIpsilo.ext) <- c("ID", "time", "score")
