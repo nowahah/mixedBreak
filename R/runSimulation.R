@@ -57,7 +57,12 @@ one.at.a.time <- function(...){
   }
   
   # distinct() to not repeat reference scenario multiple times
-  return(scenario.data %>% mutate(across(-fac.var, as.numeric)) %>% distinct())
+  scenario.data <- scenario.data %>% 
+    distinct() %>%
+    mutate(across(-fac.var, as.numeric),
+           scenarID = 1:n.scenario)
+  
+  return(scenario.data)
 }
 
 scenario.data <- one.at.a.time(
@@ -152,7 +157,7 @@ for (ii in 1:nrow(scenario.data)){
     # if (sim.nb!=11) next
 
     ## 0. update 'progress bar' information
-    if (sim.nb %% 100 == 0){ print(paste(sim.nb, "/", nsimAll)) }
+    if (sim.nb %% 10 == 0){ print(paste(sim.nb, "/", nsimAll)) }
 
     ## 1. set seed
     set.seed(allseeds[sim.nb])
@@ -193,7 +198,7 @@ for (ii in 1:nrow(scenario.data)){
         )
       },
       error = function(e){
-        print("Error during estimation of 'segmented.lme' model.")
+        # print("Error during estimation of 'segmented.lme' model.")
         # browser()
         estimates.seglme[estimates.seglme$simID == sim.nb, 'error'] <<- e$message
       }
@@ -212,7 +217,7 @@ for (ii in 1:nrow(scenario.data)){
 
       },
       error = function(e){
-        print("Error during estimation of 'segreg' model.")
+        # print("Error during estimation of 'segreg' model.")
         # browser()
         estimates.segreg[estimates.segreg$simID == sim.nb, 'error'] <<-
           paste(c(e$body, e$parent$message), collapse=" ==> ")
@@ -260,6 +265,7 @@ for (ii in 1:nrow(scenario.data)){
 ending.seed <- .Random.seed
 end.time <- Sys.time()
 rm(ii, jj, sim.nb, break.3, score.sd, true.traj, sim.data)
+rm(n.patients, score.sd.slopes, break01.sd, break12.sd, break12.mean)
 rm(res.segreg, res.seg.lme, mod.segreg, mod.lme, mod.seg.lme)
 
 # END
@@ -277,5 +283,7 @@ print(end.time-start.time)
 library(writexl)
 write_xlsx(estimates.seglme, "data/esimates_seglme.xlsx")
 write_xlsx(estimates.segreg, "data/esimates_segreg.xlsx")
-write_xlsx(data.frame(ending.seed), "data/random_seed.xlsx")
-
+write_xlsx(list(true.parameters=true.parameters, scenario.data = scenario.data), 
+           "data/true_parameters.xlsx")
+write_xlsx(list(all.seeds=data.frame(allseeds), ending.seed=data.frame(ending.seed)), 
+                "data/random_seed.xlsx")
