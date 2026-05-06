@@ -11,9 +11,8 @@ source("R/normalize.R")
 ## Simulation parameters ====
 
 # FIXED PARAMETERS
-n.sim <- 559L # 559L nb of repetition for each scenario
+n.sim <- 594L # 594L nb of repetition for each scenario
 times <- list("value" = 20, "sd" = 2) # time of measurement in simulated experiments
-outlier.prob <- 1 / 2 # individual probability of having exactly one outlier observation
 na.prob <- 1 / 20 # measurement probability to be missing
 n.trail <- -1L # nb of trailing observations (default is -1)
 break.min.dist <- list(x = 45, y = 0) # min between-breakpoints distance
@@ -25,9 +24,10 @@ plateau.sd <- .25
 # ref.ind: index of case-based value in vector of value
 n.obs <- list(value = c(10, 15, 20, 25, 50, 100), ref.ind = 4) # nb of observations in the datasets
 score.sd.slopes <- list(value = c(0.5, 1, 2), ref.ind = 2) # level of noise during slopes
-break01.sd <- list(value = c(5, 15, 33), ref.ind = 2) # level of noise on break1 time coordinate
-break12.mean <- list(value = c(32, 78, 143), ref.ind = 2) # avg distance between break1 and end
-break12.sd <- list(value = c(5, 15, 33), ref.ind = 2) # noise on distance between break1 and end
+break.sd <- list(value = c(5, 15, 33), ref.ind = 2) # level of noise on break1 time coordinate
+peak.duration.mean <- list(value = c(32, 78, 143), ref.ind = 2) # avg distance between break1 and end
+outlier.prob <- list(value = c(0,.5,1), ref.ind = 2) # individual probability of having exactly one outlier observation
+
 
 
 # SIMULATION GRID (varying parameters only - could add fixed ones also)
@@ -68,11 +68,11 @@ one.at.a.time <- function(...){
 scenario.data <- one.at.a.time(
   n.obs = n.obs, 
   score.sd.slopes = score.sd.slopes, 
-  break01.sd = break01.sd, 
-  break12.sd = break12.sd, 
-  break12.mean = break12.mean
+  break.sd = break.sd, 
+  peak.duration.mean = peak.duration.mean,
+  outlier.prob = outlier.prob
 )
-rm(n.obs, score.sd.slopes, break01.sd, break12.sd, break12.mean)
+rm(n.obs, score.sd.slopes, outlier.prob, break.sd, peak.duration.mean)
 
 
 ## Seed management ====
@@ -95,7 +95,7 @@ true.parameters <- data.frame(
   break.y1 = NA_real_
 )
 
-# TODO estimates dataset
+# estimates dataset - mixed model
 estimates.seglme <- data.frame(
   simID = true.parameters$simID,
   patientID = true.parameters$patientID,
@@ -108,7 +108,7 @@ estimates.seglme <- data.frame(
   break.CI95.up = NA_real_,
   error = NA
 )
-# TODO - update fields
+# estimates dataset - plateau model
 estimates.segreg <- data.frame(
   simID = true.parameters$simID,
   patientID = true.parameters$patientID,
@@ -132,9 +132,10 @@ for (ii in 1:nrow(scenario.data)){
   ## Scenario set up
   n.patients <- scenario.data[ii, "n.obs"]
   score.sd.slopes <- scenario.data[ii, "score.sd.slopes"]
-  break01.sd <- scenario.data[ii, "break01.sd"]
-  break12.sd <- scenario.data[ii, "break12.sd"]
-  break12.mean <- scenario.data[ii, "break12.mean"]
+  break01.sd <- scenario.data[ii, "break.sd"]
+  break12.sd <- scenario.data[ii, "break.sd"]
+  break12.mean <- scenario.data[ii, "peak.duration.mean"]
+  outlier.prob <- scenario.data[ii, "outlier.prob"]
 
   score.sd <- list("slope" = score.sd.slopes, "plateau" = plateau.sd)
 
@@ -157,7 +158,7 @@ for (ii in 1:nrow(scenario.data)){
     # if (sim.nb!=11) next
 
     ## 0. update 'progress bar' information
-    if (sim.nb %% 10 == 0){ print(paste(sim.nb, "/", nsimAll)) }
+    if (sim.nb %% 100 == 0 | sim.nb %in% c(2, nsimAll)){ print(paste(sim.nb, "/", nsimAll)) }
 
     ## 1. set seed
     set.seed(allseeds[sim.nb])
@@ -191,9 +192,10 @@ for (ii in 1:nrow(scenario.data)){
           na.action = na.omit,
           control = lmeControl(msMaxIter = 1000, msMaxEval = 1000)
         )
-
+        
+        # browser()
         mod.seg.lme <- segmented.lme(
-          mod.lme, ~seg(0+time, est=c(1,0)),
+          mod.lme, ~time,
           random = list(ID = pdDiag(~1+G0))
         )
       },
@@ -272,6 +274,7 @@ rm(res.segreg, res.seg.lme, mod.segreg, mod.lme, mod.seg.lme)
 
 print("Simulation study lasted for:")
 print(end.time-start.time)
+# Time difference of 9.825832 hours
 # print("Average time/iteration:")
 # print((end.time-start.time)/nsimAll)
 # print("Estimated simulation study duration (in hours):")
