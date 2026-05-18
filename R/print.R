@@ -55,3 +55,23 @@ print.trajData <- function(sim.data, default = FALSE, dgm = T, n.lines = 10L,
   }
 }
 
+## Method for object of class 'break.lm' 
+##' @export
+print.break.lm <- function(x, default = FALSE,
+                           digits = max(3L, getOption("digits") - 3L)){
+  if(default){
+    print.data.frame(sim.data)
+  }else{
+    cat("\nCall:\n", paste(deparse(x$call), sep = "\n", collapse = "\n"), 
+        "\n\n", sep = "")
+    if (length(coef(x))) {
+      cat("Coefficients:\n")
+      print.default(format(x$coefficients, digits = digits), print.gap = 2L, 
+                    quote = FALSE)
+    }
+    else cat("No coefficients\n")
+    cat("\n")
+    invisible(x)
+    
+  }
+}

@@ -1,6 +1,6 @@
 # Original data files should not be exported
-source
-data
+source/
+data/
 
 # History files
 .Rhistory

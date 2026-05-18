@@ -38,7 +38,6 @@ plot.trajTruth <- function(true.traj, breakpoints = T, lines = T,
 
 
 ## Method for object of class 'trajData'
-# graphical review of simulated dataset
 ##' @export
 plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
                           cluster = levels(sim.data$sim.dataset$ID),
@@ -114,4 +113,37 @@ plot.trajData <- function(sim.data, breakpoints = T, lines = T, default = F,
   }
   
   return(p)
+}
+
+
+## Method for object of class 'break.lm'
+##' @export
+plot.break.lm <- function(z, breaks = T, fit = T, default = F,
+                          fit.color = "#DF546B", lwd = 2, cex = 1, breaks.ci = F) {
+  if (default){
+    print.default(z)
+  } else {
+    x <- z$x
+    y <- z$y
+    peak.y <- z$peak.y
+    psi <- z$psi
+    
+    plot(x, y, pch = 20, ylim = c(0, max(10, peak.y)),
+         main = "101 Model's fit",
+         xlab = "Time since drug intake (minutes)",
+         ylab = "Subjective Drug Intensity")
+    
+    if (breaks) points(psi, rep(peak.y, 2), pch = 17, col = fit.color, cex = cex)
+    if (fit) {
+      # TODO - change when intercept is nonnull (or pattern != 101)
+      break.data <- data.frame(
+        x = c(0, psi, max(x)),
+        y = c(0, rep(peak.y, 2), peak.y + z$coefficients[2]*(max(x) - psi[2]))
+      )
+      lines(break.data$x, break.data$y, col = fit.color, lwd = lwd)
+    }
+    if (breaks.ci) {
+      warning("Parameter 'breaks.ci' is ignored at the moment")
+    }
+  }
 }

@@ -21,8 +21,8 @@ for(i in 1:nrow(scenario.data)){
 scenarLabel[ref.ind] <- paste(scenarLabel[ref.ind], "(REF)")# should I ?
 scenario.data$scenarLabel <- scenarLabel
 
-## 1. Graphical explanatory analysis ====
-# 1.1. Distribution of theta and sd.theta - for each method and data generating model
+# 1. Graphical explanatory analysis ====
+## 1.1. Distribution of theta and sd.theta - for each method and data generating model ====
 # LOOK FOR: outliers, overall distribution of data
 
 # creating appropriate dataset with labels for the plot
@@ -42,10 +42,10 @@ ggplot(dataset , aes(x=break.avg)) +
         axis.ticks.y=element_blank())
 # order is a bit odd
 
-# 1.2. Bivariate plot of theta
+## 1.2. Bivariate plot of theta ====
 # LOOK FOR: correlation between methods, systematic differences
 
 
-# 1.3. Zip plot: CI ranked by |zi|=|thetai-theta|/sd.theta
+## 1.3. Zip plot: CI ranked by |zi|=|thetai-theta|/sd.theta ====
 # LOOK FOR: issue with coverage
 
