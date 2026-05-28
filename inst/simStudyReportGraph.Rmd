@@ -1,0 +1,339 @@
+---
+title: 'Evaluating existing statistical methods for linear segmented relationship:
+  A Simulation Study'
+author: "Noah Degoulange"
+date: "`r Sys.Date()`"
+output:
+  bookdown::html_book:
+    theme: united
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak")
+```
+
+
+```{r pkg, include=F}
+library(dplyr)      # data manipulation
+library(ggplot2)    # plots/graphs
+library(readxl)     # read excel files
+library(knitr)      # markdown layout
+library(gt)         # table formatting
+library(latex2exp)  # include latex in graphs
+library(rsimsum)    # analyze/plot results from simulation study
+library(stringr)
+```
+
+
+```{r load_results, include=FALSE}
+estimates.seglme <- read_excel("data/esimates_seglme.xlsx")
+estimates.segreg <- read_excel("data/esimates_segreg.xlsx", guess_max = 10000L)
+true.parameters <- read_excel("data/true_parameters.xlsx", sheet = "true.parameters")
+scenario.data <- read_excel("data/true_parameters.xlsx", sheet = "scenario.data")
+all.seeds <- read_excel("data/random_seed.xlsx", sheet = "all.seeds")$allseeds
+# ending.seed <- read_excel("data/random_seed.xlsx", sheet = "ending.seed")$ending.seed
+# restore with .GlobalEnv$.Random.seed <- ending.seed
+TRUE.PSI <- 77
+```
+
+
+```{r compute_label, include=FALSE}
+ref.ind <- which(scenario.data$fac.var=="REFERENCE")
+scenario.data$fac.var[ref.ind] <- scenario.data$fac.var[ref.ind-1]
+scenarLabel <- character(nrow(scenario.data))
+for(i in 1:nrow(scenario.data)){
+  scenarLabel[i] <- paste(scenario.data$fac.var[i],"=", 
+                          scenario.data[i, scenario.data$fac.var[i]])
+}
+scenarLabel[ref.ind] <- paste(scenarLabel[ref.ind], "(REF)") # should I ?
+reorder.index <- c(2,1,12,11,13,14,9,10, 3,5,6,7,8,4)
+scenario.data$scenarLabel <- as.factor(scenarLabel)
+scenario.data$scenarLabel <- factor(scenario.data$scenarLabel, 
+                                    levels(scenario.data$scenarLabel)[reorder.index])
+levels(scenario.data$scenarLabel) <- paste0("(", 1:nrow(scenario.data), ") ", 
+                                            levels(factor(scenario.data$scenarLabel)))
+
+# prepare TeX-ready expressions for labels ?
+```
+
+
+==============================================
+
+# Graphical exploratory analysis
+
+Before undertaking formal analysis of the performance measurements, graphical exploratory analysis will be helpful in assessing some characteristics of the simulated datasets, namely: the breakpoint time-distribution, correlation and systematic differences between methods, and issues with coverage.
+
+## Distribution of $\hat{\psi_i}$ for each method and scenario
+
+This graph aims at having an overview of the breakpoint estimates distribution, especially looking for outliers. The parameter of interest is $\psi$, the breakpoint time-location, and was simulated following a truncated log-normal distribution, with mean $\mu_\psi=77$ minutes for every data-generating mechanism (DGM, will be equally referred to as scenario).
+
+
+### _segmented.lme_
+
+The distribution of the estimated breakpoints $\hat\psi$ for the reference scenario is plotted below:
+
+```{r est_dist.lme}
+dataset1 <- estimates.seglme %>% 
+  select(simID, break.avg) %>%
+  distinct() %>% 
+  left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
+  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+  distinct()
+
+ggplot(dataset1 %>% filter(str_detect(scenarLabel, "REF")), aes(x = break.avg, y = -0.5)) +
+  geom_boxplot() +
+  geom_density(aes(x = break.avg), inherit.aes = FALSE) +
+  geom_vline(xintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
+  labs(title="Empirical breakpoint.x distribution for reference scenario",
+       subtitle = paste("True mean = 77 ; Empirical mean =",
+                        round(mean(dataset1$break.avg[str_detect(scenarLabel, "REF")], na.rm=T),1),
+                        "; Median =", round(median(dataset1$break.avg[str_detect(scenarLabel, "REF")], na.rm=T),1))) +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+```
+
+The distribution of estimated breakpoint is notably right-skewed, with the true mean being over the mode and median by 3.4 minutes, which could be a significant bias in the method. 
+<!-- From a clinical perspective, is this amount of time relevant ?? -->
+
+Most importantly, the scenario-wise distribution is the following:
+
+```{r est_dist.lme.dgm}
+dataset1.lme <- estimates.seglme %>% 
+  select(simID, break.avg) %>% 
+  distinct() %>% 
+  left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
+  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+  distinct()
+
+# boxplot
+ggplot(dataset1.lme , aes(x = scenarLabel, y = break.avg)) +
+  geom_boxplot() +
+  geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
+  coord_flip() +
+  labs(title=TeX("Empirical \\hat{\\psi} distribution for every data-generating mechanism"),
+       subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
+  ylab(TeX("Breakpoint estimates \\hat{\\psi} distribution")) +
+  xlab("(scenario.nb) parameter varying from reference")
+```
+
+The labels on the _y_-axis corresponds to the parameter varying with all of the others being of the reference "cased-base" (scenario 7).
+
+This panel reflects that the right skewness is dispatched among every DGM, though is it highly tempered by the longest plateau duration ($T_{peak}=143$ minutes).
+The two notable outliers occurred for the same DGM, which has the highest residual variance ($\sigma_\varepsilon=2$) during slopes phases.
+
+For the mixed model method, it visually looks like high standard deviation on the breakpoint $\sigma_\psi$ and low duration of plateau $T_{peak}$ biases the population-level estimate (under-estimation).
+
+This observation is consistent with our hypothesis: because the plateau is not enforced into the mixed model, it might be that a positive slope is estimated in the second phase of the relationship between response and time (the true data being constant, it is mostly unlikely that the model estimates a negative slope). This additional degree of freedom induces bias by underestimating the breakpoint time coordinate $\hat{\psi}$.
+
+
+
+### _segreg_
+
+```{r est_dist.segreg.dgm}
+dataset1.segreg <- estimates.segreg %>% 
+  group_by(simID) %>%
+  summarise(
+    break.avg = mean(break.x1),
+  ) %>%
+  select(simID, break.avg) %>% 
+  distinct() %>% 
+  left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
+  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+  distinct()
+
+# boxplot
+ggplot(dataset1.segreg , aes(x = scenarLabel, y = break.avg)) +
+  geom_boxplot() +
+  geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
+  coord_flip() +
+  labs(title=TeX("Empirical \\hat{\\psi} distribution for every data-generating mechanism"),
+       subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
+  ylab(TeX("Breakpoint estimates \\hat{\\psi} distribution")) +
+  xlab("(scenario.nb) parameter varying from reference")
+```
+
+Overall, the distribution appears to be centered around the true value, albeit some scenario exhibits substantial deviation from the true value $\psi$. No remarkable outliers are to be noted.
+
+## Bivariate plot of $\hat{\psi_i}$ for each DGM
+
+With this plot, the goal is to try and look for correlation between the two methods, and any systematic differences for a given DGM.
+
+The estimated breakpoint $\psi$ is represented on both axis, each axis corresponding to one of the two methods.
+
+```{r biv_plot}
+dataset2 <- estimates.segreg %>%
+  group_by(simID) %>%
+  summarise(est.psi.segreg = mean(break.x1)) %>%
+  left_join(estimates.seglme %>%
+              select(simID, break.avg) %>%
+              distinct(), by = "simID") %>%
+  rename(est.psi.seglme = break.avg) %>%
+  left_join(true.parameters %>% select(simID, scenarID) %>% distinct(), by="simID") %>%
+  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID")
+
+ggplot(dataset2 %>% filter(str_detect(scenarLabel, "REF")), aes(x=est.psi.segreg, y=est.psi.seglme)) +
+  geom_point(alpha=.5) +
+  geom_abline(slope=1, lty = "dashed", colour="orange2") +
+  labs(title=TeX("Bivariate plot of \\hat{\\psi} for the reference scenario"),
+       subtitle = paste("Dashed line is y = x ; Correlation is",
+                        round(cor(dataset2$est.psi.segreg[str_detect(scenarLabel, "REF")],
+                                  dataset2$est.psi.seglme[str_detect(scenarLabel, "REF")],
+                                  use = "pairwise.complete.obs"), 2))) +
+  xlab(TeX("Estimated \\hat{\\psi} for 'segreg'")) +
+  ylab(TeX("Estimated \\hat{\\psi} for 'segmented.lme'"))
+
+cor.test(dataset2$est.psi.segreg[str_detect(scenarLabel, "REF")],
+         dataset2$est.psi.seglme[str_detect(scenarLabel, "REF")])$conf.int
+```
+
+The data pairs come from the same repetition (ie, they are estimated in the same simulated dataset) and are compared to the line of equality $y=x$. The scatter plot for the reference scenario depicts disagreement between the two methods, correlation being as low as $\hat\rho \hspace{1mm} [CI95\%] = 0.45 \hspace{1mm} [0.37 - 0.52]$.
+
+The bivariate plot is produced in a panel for every data-generating mechanism below:
+
+```{r biv_plot.dgm, fig.width=10}
+dataset2.scenar <- dataset2 %>%
+  group_by(scenarLabel) %>%
+  mutate(rho = cor(est.psi.segreg, est.psi.seglme, use = "na.or.complete"),
+         scenarLabel = as.factor(paste(scenarLabel, "; corr =", round(rho, 2))))
+
+ggplot(dataset2.scenar, aes(x=est.psi.segreg, y=est.psi.seglme)) +
+  geom_point(alpha=.5) + 
+  facet_wrap(~scenarLabel) +
+  geom_smooth(method = lm) +
+  geom_abline(slope=1, lty = "dashed", colour="orange2") +
+  labs(title=TeX("Bivariate plot of \\hat{\\psi} for every scenario"),
+       subtitle = paste("Dashed line is y=x ; Average correlation is", 
+                        round(cor(dataset2$est.psi.segreg, dataset2$est.psi.seglme,
+                                  use = "pairwise.complete.obs"), 2))) +
+  xlab(TeX("Estimated \\hat{\\psi} for 'segreg'")) +
+  ylab(TeX("Estimated \\hat{\\psi} for 'segmented.lme'"))
+```
+
+This panel exhibits heterogeneous between-method correlation among the different scenarios, the lowest being 0.33 scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.77 for the one with the longest plateau duration $T_{peak}=143$.
+
+Overall, the correlation in the breakpoint estimate between the two methods is low to moderate, but not satisfactory.
+
+
+## Zip plot
+
+A zip plot is a plot of confidence intervals (CI) fractionally ranked by $|z_i|$, with $z_i := \frac{(\hat{\psi_i} - \psi)}{\sigma_{\psi}}$. It is a mean of understanding issue with coverage.
+
+
+### _segmented.lme_
+
+```{r zip_plot.seglme, fig.width=10}
+seglme.df <- estimates.seglme %>%
+  group_by(simID) %>%
+  summarise(break.avg = first(break.avg),
+            break.x1.sd = first(break.x1.sd),
+            break.x1.random = first(break.x1.random),
+            break.CI95.low = first(break.CI95.low),
+            break.CI95.up = first(break.CI95.up))
+segreg.df <- estimates.segreg %>%
+  group_by(simID) %>%
+  summarise(break.avg = mean(break.x1),
+            break.x1.sd = sd(break.x1),
+            break.CI95.low = mean(break.CI95.low),
+            break.CI95.up = mean(break.CI95.up))
+
+# # dataset with z.score for zip plots
+# dataset <- seglme.df %>%
+#   bind_rows(segreg.df, .id = "method") %>%
+#   mutate(method = if_else(method==1, "segmented.lme", "segreg")) %>%
+#   left_join(true.parameters %>% select(simID, scenarID) %>% distinct(),
+#             by = "simID") %>%
+#   left_join(scenario.data %>% select(scenarID, scenarLabel), by= "scenarID") # %>%
+#   group_by(scenarLabel) %>%
+#   mutate(z.score = (break.avg - TRUE.PSI)/break.x1.sd,
+#          z.rank = rank(abs(z.score))/n(),
+#          contains = TRUE.PSI > break.CI95.low & TRUE.PSI < break.CI95.up)
+# 
+# p <- ggplot(dataset %>% filter(method=="segmented.lme"),
+#        aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up,
+#            colour = contains)) +
+#   geom_segment() +
+#   facet_wrap(~scenarLabel) +
+#   geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
+#   geom_hline(yintercept = 0.95, linetype = "dashed") +
+#   labs(colour = "") +
+#   xlab("95% confidence intervals") +
+#   ylab("Fractional centiles of |z-score|") +
+#   scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
+#   theme(legend.position = "bottom")
+
+seglme.res <- simsum(
+  dataset %>% filter(method=="segmented.lme"), 
+  estvarname = "break.avg", 
+  se = "break.x1.sd",
+  true = TRUE.PSI, # true value of estimated parameter 
+  by = "scenarLabel", # factor of data-generating mechanism
+  ci.limits = c("break.CI95.low", "break.CI95.up"),
+  x = TRUE # necessary for zip plots
+)
+
+cover.conf.int <- seglme.res$summ %>%
+  filter(stat == "cover") %>% 
+  mutate(cover.95.low = est + qnorm(0.025)*mcse,
+         cover.95.up = est - qnorm(0.025)*mcse) %>% 
+  group_by(scenarLabel)
+
+# p +
+#   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.low), 
+#              linetype = "dashed", linewidth = 1.2, colour = "yellow") + 
+#   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up), 
+#              linetype = "dashed", linewidth = 1.2, colour = "yellow") +
+#   ylim(c(0.5, 1))
+
+autoplot(seglme.res, type="zip") + # zip plot !
+  labs(title = "Zip plot for method 'segmented.lme' for every DGM")
+# TODO - is there a scale problem on the panel in which the |z-score| fraction 
+# does not reach 1 ? I would say yes, fractional z should be computed for every DGM!
+# FIX |z|-scale issue
+
+plot.data <- autoplot(seglme.res, type="zip")@data
+pp <- plot.data %>% 
+  select(scenarLabel:simID, z, lower:upper, rank) %>%
+  ggplot()
+pp +
+  geom_segment(aes(y=z.frac.rank, x=lower, xend=upper, colour=)) +
+  facet_wrap(~scenarLabel)
+# zip plot mystery...
+
+```
+
+Blue CIs are coverers (_ie_ they include the true value $\psi$), red CIs are non-coverers (_ie_ they do not include the true value $\psi$). The yellow dashed lines represents the confidence interval on the coverage probability estimate.
+
+The panel shows substantial undercoverage for every DGM but  the first one (lowest $\sigma_\psi=5$). Non-coverers can take up to more than 50% of all CIs for a given DGM, which questions the legitimacy of their name.
+
+Undercoverage typically happens for two reasons: 1) bias in $\hat\psi$ ; 2) underestimation of the standard deviation of parameter $\hat\sigma^2_{\hat\psi}$. In our case, we already know about the bias on the breakpoint estimate, so it remains unclear whether or not the standard deviation of the breakpoint has an role in this undercoverage.
+
+<!-- Ironically enough, whilst some parameters were expected to have a harmful impact on performances (such as lower number of observations or higher outlier probability), they tend to patch undercoverage due to the substantial underestimation in $\hat\psi$. -->
+
+
+### _segreg_
+
+
+```{r zip_plot.segreg, fig.width=10}
+segreg.res <- simsum(
+  dataset %>% filter(method=="segreg"), 
+  estvarname = "break.avg", 
+  se = "break.x1.sd",
+  true = TRUE.PSI, # true value of estimated parameter 
+  by = "scenarLabel", # factor of data-generating mechanism
+  ci.limits = c("break.CI95.low", "break.CI95.up"),
+  x = TRUE # necessary for zip plots
+)
+autoplot(segreg.res, type="zip") + # zip plot !
+  labs(title = "Zip plot for method 'segreg' for every DGM")
+# TODO - same scale fix todo (maybe in another file)
+# autoplot(summary(seglme.res), type = "lolly", stats = "bias") # TODO - add MCSE
+```
+
+On the other side, _segreg_ method demonstrates substantial overcoverage, with a point estimate being not significantly different from 100% for every DGM.
+
+This is most likely due to an over-estimation of the variance of breakpoint $\hat\sigma_{\hat\psi}$. Scenario (2) exhibits a potential over estimation of $\hat\psi$ when its variance $\sigma^2_\psi$ is higher.

@@ -1,0 +1,223 @@
+---
+title: 'Evaluating existing statistical methods for linear segmented relationship:
+  A Simulation Study'
+author: "Noah Degoulange"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak")
+```
+
+
+```{r pkg, include=F}
+library(dplyr)      # data manipulation
+library(ggplot2)    # plots/graphs
+library(readxl)     # read excel files
+library(knitr)      # markdown layout
+library(gt)         # table formatting
+library(latex2exp)
+library(rsimsum)
+library(tidyr)
+```
+
+
+```{r load_results, include=FALSE}
+estimates.seglme <- read_excel("data/esimates_seglme.xlsx")
+estimates.segreg <- read_excel("data/esimates_segreg.xlsx", guess_max = 10000L)
+true.parameters <- read_excel("data/true_parameters.xlsx", sheet = "true.parameters")
+scenario.data <- read_excel("data/true_parameters.xlsx", sheet = "scenario.data")
+all.seeds <- read_excel("data/random_seed.xlsx", sheet = "all.seeds")$allseeds
+TRUE.PSI <- 77
+# ending.seed <- read_excel("data/random_seed.xlsx", sheet = "ending.seed")$ending.seed
+# restore with .GlobalEnv$.Random.seed <- ending.seed
+```
+
+
+```{r compute_label, include=FALSE}
+ref.ind <- which(scenario.data$fac.var=="REFERENCE")
+scenario.data$fac.var[ref.ind] <- scenario.data$fac.var[ref.ind-1]
+scenarLabel <- character(nrow(scenario.data))
+for(i in 1:nrow(scenario.data)){
+  scenarLabel[i] <- paste(scenario.data$fac.var[i],"=", 
+                          scenario.data[i, scenario.data$fac.var[i]])
+}
+scenarLabel[ref.ind] <- paste(scenarLabel[ref.ind], "(REF)") # should I ?
+reorder.index <- c(2,1,12,11,13,14,9,10, 3,5,6,7,8,4)
+scenario.data$scenarLabel <- as.factor(scenarLabel)
+scenario.data$scenarLabel <- factor(scenario.data$scenarLabel, 
+                                    levels(scenario.data$scenarLabel)[reorder.index])
+levels(scenario.data$scenarLabel) <- paste0("(", 1:nrow(scenario.data), ") ", 
+                                            levels(factor(scenario.data$scenarLabel)))
+```
+
+
+```{r metrics_dataset}
+## creation of unique dataset with all results for both methods
+seglme.res <- estimates.seglme %>%
+  group_by(simID) %>%
+  summarise(break.avg = first(break.avg),
+            break.x1.sd = first(break.x1.sd),
+            break.x1.random = first(break.x1.random),
+            break.CI95.low = first(break.CI95.low),
+            break.CI95.up = first(break.CI95.up))
+segreg.res <- estimates.segreg %>% 
+  group_by(simID) %>%
+  summarise(break.avg = mean(break.x1),
+            break.x1.sd = sd(break.x1),
+            break.CI95.low = mean(break.CI95.low),
+            break.CI95.up = mean(break.CI95.up))
+dataset <- seglme.res %>%
+  bind_rows(segreg.res, .id = "method") %>%
+  mutate(method = if_else(method==1, "segmented.lme", "segreg")) %>%
+  left_join(true.parameters %>% 
+              select(simID, scenarID) %>% 
+              distinct(), 
+            by = "simID") %>%
+  left_join(scenario.data %>%
+              select(scenarID, scenarLabel), 
+            by= "scenarID")
+
+metrics <- simsum(
+  dataset, 
+  estvarname = "break.avg", 
+  se = "break.x1.sd",
+  true = TRUE.PSI, # true value of estimated parameter 
+  methodvar = "method", # variable containing the methods to compare
+  ref = "segreg",
+  by = "scenarLabel", # factor of data-generating mechanism
+  ci.limits = c("break.CI95.low", "break.CI95.up"),
+  x = TRUE, # necessary for zip plots
+  control = list(mcse = TRUE)
+)
+
+# every metrics in summary
+summ <- summary(metrics, stats = c("thetamean", "se2mean", "bias", "empse", 
+                                   "cover", "becover"))
+```
+
+# Performance measurements and Monte Carlo Standard Errors
+
+Formal analysis of the simulation study results goes through performance measurements. In our case we decided to retain bias on the breakpoint estimate, empirical SE of the estimate, and coverage probability of confidence intervals.
+
+The results are presented as point estimate along with their Monte Carlo Standard Error (MCSE). This helps quantifying the uncertainty due to the limited number of repetitions we ran for every scenario ($n_{sim}=594$). Consequently, Monte Carlo confidence intervals can be derived for every performance measure estimate.
+
+Results will be exhaustively presented in a table, and when appropriate, with a graph
+
+
+## Lollipop plots
+
+```{r lolli_bias}
+autoplot(summ, stats = "bias", type = "lolly") +
+  labs(title = TeX("Bias in breakpoint estimate \\hat{\\psi}"),
+       subtitle = "For both methods and every DGM") +
+  xlab(TeX("Relative bias in breakpoint estimate \\hat{\\psi}"))
+```
+
+One can only notice the substantial and significant bias that the mixed model suffers from. The plateau model performs much better. Though it demonstrates a significant bias in a lot of scenarios, it is often not clinically relevant quantity (12/14 have an absolute bias under 1 minutes).
+
+This observation has to be tempered by the fact that we reported the population-level breakpoint $\hat\psi$. The individual breakpoints $\hat\psi_i$ might demonstrates other properties for the same performance measurements.
+
+
+<!-- ```{r lolli_cover} -->
+<!-- # APPENDIX? -->
+<!-- autoplot(summ, stats = "cover", type = "lolly") + -->
+<!--   labs(title = TeX("Coverage probability for \\hat{\\psi}"), -->
+<!--        subtitle = "For both methods and every DGM") + -->
+<!--   xlab("Coverage probability estimate (CI95%)") -->
+<!-- ``` -->
+
+The coverage probability is not reaching the nominal level of 95% for any of the methods.
+
+The plateau model shows an overcoverage, reaching a coverage of 100% in every DGM. Because it does not suffer from a substantial bias, it is most certainly due to an overestimation of the variance of the estimator $\hat\sigma_{\hat\psi}$.
+
+On the other hand, the mixed model suffers from a substantial undercoverage. It may be due to both bias and underestimation of the breakpoints variance. To take bias into consideration, we can look at another performance measure, the "bias-eliminated coverage", which helps evaluating the estimators' performance under the assumption that they are unbiased:
+
+<!-- ```{r lolli_becover} -->
+<!-- # APPENDIX - easier to comment with the numbers -->
+<!-- autoplot(summ, stats = "becover", type = "lolly")  + -->
+<!--   labs(title = TeX("Bias-eliminated coverage for \\hat{\\psi}"), -->
+<!--        subtitle = "For both methods and every DGM") + -->
+<!--   xlab("Bias eliminated coverage probability estimate (CI95%)") -->
+<!-- ``` -->
+
+We can assess the negative impact of bias on the coverage probability, though it clearly remains a substantial undercoverage, with an important variability across scenarios.
+
+
+
+## Table
+
+```{r performance_table}
+# computing the table of performance measurements
+formatted.res <- summ$summ %>% 
+  select(-c("lower", "upper")) %>%
+  filter(stat %in% c("bias", "empse", "cover", "becover")) %>%
+  pivot_wider(names_from = method, values_from = c(est:mcse)) %>%
+  arrange(stat) %>%
+  mutate(round.lme = -floor(log10(abs(mcse_segmented.lme))),
+         segmented.lme = paste0(round(est_segmented.lme, round.lme), " (", 
+                                round(mcse_segmented.lme, round.lme), ")"),
+         round.seg = -floor(log10(abs(mcse_segreg))),
+         segreg = paste0(round(est_segreg, round.seg), " (", 
+                         round(mcse_segreg, round.seg), ")"))
+
+# printing the table of performance measurements
+formatted.res %>%
+  select(stat, scenarLabel, segmented.lme, segreg) %>%
+  rename(seglme = segmented.lme) %>%
+  pivot_wider(names_from = stat, values_from = c("seglme", "segreg")) %>%
+  relocate(seglme_bias, seglme_empse, seglme_cover) %>% # to order the table
+  gt(
+    rowname_col = "scenarLabel",
+    row_group_as_column = TRUE
+  ) %>%
+  tab_header(title = "Performance measurements per method and DGM (MCSE in parenthesis)") %>%
+  tab_stubhead(label = md("**DGM**")) %>%
+  cols_align(align = "left", columns = scenarLabel) %>%
+  tab_spanner(label=md("**Bias**"), columns=ends_with("_bias")) %>%
+  tab_spanner(label=md("**EmpSE**"), columns=ends_with("_empse")) %>%
+  tab_spanner(label=md("**Coverage**"), columns=ends_with("_cover")) %>%
+  tab_spanner(label=md("**Bias-eliminated coverage**"), columns=ends_with("_becover")) %>%
+  # conditional formatting on bias/coverage significance w\ respect to target (0, .95) ?
+  # tab_style(
+  #   style = cell_fill(color = "#f8d7da"),
+  #   locations = cells_body(
+  #     columns = c("seglme_bias", "segreg_bias"),
+  #     rows = 0 %in% # CI95%(bias)
+  #   )
+  # ) %>%
+  tab_options(table.font.size = 12) %>%
+  opt_stylize(style = 1, color = "cyan")
+```
+
+
+<!-- For bias, it could be nice to add a little sign to say if its significantly different from 0. -->
+<!-- In general, it could be nice to format with a indicator symbol if the performance measure reached the target or not -->
+
+Overall, there is a significant bias in the breakpoint estimate $\hat\psi$, notably underestimated by the mixed model, and misestimated in about half DGM for the plateau model.
+
+TODO - ONE COMMENT PER METRIC
+
+
+The plateau model  is reaching the ceiling of 100% coverage in every scenario. It is most certainly a consequence of overestimating the breakpoint standard error $\hat\sigma_\hat\psi$ because bias appears to be moderate.
+
+Effect of simulation parameters on the performance measurements:
+
+- $\sigma_\psi$ (DGM 1,2 + ref): The higher the breakpoint individual variance, the more biased estimates are. This is also negatively impacting the coverage probability
+- $T_{peak}$ (DGM 3,4 + ref): The higher the duration of plateau, the less biased the breakpoint estimate $\hat\psi$ is. The longest plateau is the one scenario for which both methods performs well, in terms of bias at least.
+- $\sigma_\varepsilon$ (5, 6 + ref): The residual variance (noise on the point measurements in the datasets) impacts significantly and negatively bias. It does not induce a significant change in the bias-eliminated coverage.
+- $p_{out}$ (DGM 7,8 + ref): The individual probability of having exactly one outlier in the time series makes both breakpoint estimate $\hat\psi$ and its SE $\hat\sigma_{\hat\psi}$ significantly higher
+- $n_{obs}$ (DGM 9-14): Most surprisingly, when the number of observations (number of subjects per datasets) increases, it appears to bias the mixed model. For the plateau model however, it helps having unbiased estimation. As expected, the empirical SE decreases when this quantity increasing. It impacts negatively the coverage probability, but seems to have no significant impact on the bias-eliminated coverage for the mixed model (bias increasing could be compensated by the breakpoint standard error $\hat\sigma_\hat\psi$ decreasing).
+
+<!-- # Link with the clinical indicators -->
+<!-- Duration of plateau and slope up ($SDI_{peak}/\hat\psi$). -->
+
+# Discussion
+
+The results of this simulation study might appear quite surprising in the light of previous knowledge brought by Muggeo. It is however mentioned that the algorithm described "always will converge in situations with low variance, provided that the break-point exists". If it is a matter of quantification, we might have an explanation to justify the poor performance of the plateau model

@@ -1,5 +1,4 @@
 ## Import useful scripts / packages ====
-library(lmbreak)
 library(segmented)
 library(dplyr)
 
@@ -11,7 +10,7 @@ source("R/normalize.R")
 ## Simulation parameters ====
 
 # FIXED PARAMETERS
-n.sim <- 594L # 594L nb of repetition for each scenario
+n.sim <- 1L # 594L nb of repetition for each scenario
 times <- list("value" = 20, "sd" = 2) # time of measurement in simulated experiments
 na.prob <- 1 / 20 # measurement probability to be missing
 n.trail <- -1L # nb of trailing observations (default is -1)
@@ -22,11 +21,11 @@ plateau.sd <- .25
 # VARYING PARAMETERS
 # value: range of parameters
 # ref.ind: index of case-based value in vector of value
-n.obs <- list(value = c(10, 15, 20, 25, 50, 100), ref.ind = 4) # nb of observations in the datasets
+n.obs <- list(value = c(10, 15, 20, 25, 50, 100), ref.ind = 4) # nb of subjects in the datasets
 score.sd.slopes <- list(value = c(0.5, 1, 2), ref.ind = 2) # level of noise during slopes
 break.sd <- list(value = c(5, 15, 33), ref.ind = 2) # level of noise on break1 time coordinate
 peak.duration.mean <- list(value = c(32, 78, 143), ref.ind = 2) # avg distance between break1 and end
-outlier.prob <- list(value = c(0,.5,1), ref.ind = 2) # individual probability of having exactly one outlier observation
+outlier.prob <- list(value = c(0,.5,1), ref.ind = 2) # ind prob of having exactly one outlier 
 
 
 
@@ -72,12 +71,65 @@ scenario.data <- one.at.a.time(
   peak.duration.mean = peak.duration.mean,
   outlier.prob = outlier.prob
 )
+# mixed data frame integration ? 
+# syntax with scenarID: integer if homogeneous scenar
+# ID.group if mixed groups
+scenario.data <- rbind(scenario.data, data.frame(
+  fac.var = rep("mixed.group", 2),
+  n.obs = rep(25, 2),
+  score.sd.slopes = rep(1, 2),
+  break.sd =c(15, 33),
+  peak.duration.mean = c(32, 143),
+  outlier.prob = rep(1/2, 1),
+  scenarID = max(scenario.data$scenarID) + c(1.1, 1.2)
+))
+
 rm(n.obs, score.sd.slopes, outlier.prob, break.sd, peak.duration.mean)
+
+## Handling mixed or homogeneous scenarios
+# TODO - CHECK IF it works nicely integrated in the loop
+# TODO - add mixed group label integration in the loop
+generateData <- function(true.traj, n.patients, score.sd, times.sd, 
+                         breakpoints.sd, break.min.dist, outlier.prob, na.prob,
+                         n.trail, mixed = F){
+  if (!mixed) {
+    res <- noiseTraj(
+      true.traj, n.patients,
+      score.sd, times.sd,
+      breakpoints.sd,
+      
+      break.min.dist,
+      outlier.prob,
+      na.prob,
+      n.trail
+    )
+  } else if (mixed) {
+    # two inhomogeneous groups in the data
+    # browser()
+    df1 <- noiseTraj(
+      true.traj[[1]], n.patients[1], score.sd[[1]], times.sd[1], breakpoints.sd[[1]], 
+      break.min.dist, outlier.prob[1], na.prob[1], n.trail[1]
+    )
+    df2 <- noiseTraj(
+      true.traj[[2]], n.patients[2], score.sd[[2]], times.sd[2], breakpoints.sd[[2]], 
+      break.min.dist, outlier.prob[2], na.prob[2], n.trail[2]
+    )
+    
+    res <- list()
+    res$sim.dataset <- rbind(df1$sim.dataset %>% mutate(group=1), 
+                             df2$sim.dataset %>% mutate(group=2))
+    res$sim.gen.model <- rbind(df1$sim.gen.model %>% mutate(group=1), 
+                               df2$sim.gen.model %>% mutate(group=2))
+  }
+  
+  return(res)
+  
+}
 
 
 ## Seed management ====
 # nb of scenarios: product of length of parameter.range
-n.scenario <- nrow(scenario.data)
+n.scenario <- ceiling(max(scenario.data$scenarID)) # length(unique(floor(scenario.data$scenarID)))
 
 set.seed(20041418)
 nsimAll <- n.sim * n.scenario
@@ -88,7 +140,7 @@ allseeds <- sample.int(n = .Machine$integer.max, size = nsimAll, replace=FALSE)
 
 # true values datasets
 true.parameters <- data.frame(
-  scenarID = rep(1:n.scenario, times = n.sim*as.numeric(scenario.data[,"n.obs"])),
+  scenarID = rep(scenario.data$scenarID, times = n.sim*as.numeric(scenario.data[,"n.obs"])),
   simID = rep(1:nsimAll, times = rep(as.numeric(scenario.data[,"n.obs"]), each = n.sim)),
   patientID = sequence(rep(as.numeric(scenario.data[,"n.obs"]), each = n.sim)),
   break.x1 = NA_real_,
@@ -125,28 +177,76 @@ estimates.segreg <- data.frame(
 
 ## FIRST LOOP on sample size
 start.time <- Sys.time()
-sim.nb = 0 # iterator count
+sim.nb <- 0 # iterator count
+mixed.scenar.ii <- 0 # rows in scenario.data being part of mixed scenario (init)
 for (ii in 1:nrow(scenario.data)){
+  
+  # skip to not iterate multiple times over mixed group setting
+  if(ii %in% mixed.scenar.ii) next
 
+  ## Scenario set up (taking mixed scenario into account)
+  mixed.scenar <- scenario.data[ii, "n.obs"] != floor(scenario.data[ii, "n.obs"])
+  if (!mixed.scenar){
+    # homogeneous scenario setting
+    n.patients <- scenario.data[ii, "n.obs"]
+    score.sd.slopes <- scenario.data[ii, "score.sd.slopes"]
+    break01.sd <- scenario.data[ii, "break.sd"]
+    break12.sd <- scenario.data[ii, "break.sd"] # same value for both breaks sd
+    break12.mean <- scenario.data[ii, "peak.duration.mean"]
+    outlier.prob <- scenario.data[ii, "outlier.prob"]
+    
+    score.sd <- list("slope" = score.sd.slopes, "plateau" = plateau.sd)
 
-  ## Scenario set up
-  n.patients <- scenario.data[ii, "n.obs"]
-  score.sd.slopes <- scenario.data[ii, "score.sd.slopes"]
-  break01.sd <- scenario.data[ii, "break.sd"]
-  break12.sd <- scenario.data[ii, "break.sd"]
-  break12.mean <- scenario.data[ii, "peak.duration.mean"]
-  outlier.prob <- scenario.data[ii, "outlier.prob"]
+    break.3 <- data.frame(
+      pattern = c(1, 0, NA),
+      bp.x = cumsum(c(0, 77, break12.mean)),  # psi, time duration of each phase (from reproduced study)
+      bp.y = c(0, 9.3, 9.3),                  # height of breakpoints
+      bp.x.sd = c(0, break01.sd, break12.sd), # noise levels
+      bp.y.sd = c(0, 1, 0)
+    )
+    true.traj <- trueTraj(times[["value"]], break.3[1:3])
+    
+  } else if (mixed.scenar){
+    # mixed scenario setting
+    mixed.scenar.ii <- scenario.data$scenarID > floor(scenario.data[ii, "scenarID"]) & 
+      scenario.data$scenarID < ceiling(scenario.data[ii, "scenarID"])
+    mixed.data <- scenario.data[mixed.scenar.ii ,]
+    
+    n.patients <- scenario.data[mixed.scenar.ii, "n.obs"]
+    score.sd.slopes <- scenario.data[mixed.scenar.ii, "score.sd.slopes"]
+    break01.sd <- scenario.data[mixed.scenar.ii, "break.sd"]
+    break12.sd <- scenario.data[mixed.scenar.ii, "break.sd"] # same value for both breaks sd
+    break12.mean <- scenario.data[mixed.scenar.ii, "peak.duration.mean"]
+    outlier.prob <- scenario.data[mixed.scenar.ii, "outlier.prob"]
+    
+    score.sd <- list(
+      list("slope" = score.sd.slopes[1], "plateau" = plateau.sd),
+      list("slope" = score.sd.slopes[2], "plateau" = plateau.sd)
+    )
+    
+    g1.break <- data.frame(
+      pattern = c(1, 0, NA),
+      bp.x = cumsum(c(0, 77, break12.mean[1])), 
+      bp.y = c(0, 9.3, 9.3),                  
+      bp.x.sd = c(0, break01.sd[1], break12.sd[1]),
+      bp.y.sd = c(0, 1, 0)
+    )
+    g1.true.traj <- trueTraj(times[["value"]], g1.break[1:3])
+    g2.break <- data.frame(
+      pattern = c(1, 0, NA),
+      bp.x = cumsum(c(0, 77, break12.mean[2])), 
+      bp.y = c(0, 9.3, 9.3),                  
+      bp.x.sd = c(0, break01.sd[2], break12.sd[2]),
+      bp.y.sd = c(0, 1, 0)
+    )
+    g2.true.traj <- trueTraj(times[["value"]], g2.break[1:3])
+    true.traj <- list(g1.true.traj, g2.true.traj)
+    break.3 <- list(g1.break, g2.break)
+    
+  }
+  
 
-  score.sd <- list("slope" = score.sd.slopes, "plateau" = plateau.sd)
-
-  break.3 <- data.frame(
-    pattern = c(1, 0, NA),
-    bp.x = cumsum(c(0, 77, break12.mean)),  # psi, time duration of each phase (from reproduced study)
-    bp.y = c(0, 9.3, 9.3),                  # height of breakpoints
-    bp.x.sd = c(0, break01.sd, break12.sd), # noise levels
-    bp.y.sd = c(0, 1, 0)
-  )
-  true.traj <- trueTraj(times[["value"]], break.3[1:3])
+  
 
   ## REP LOOP on repetitions
   for (jj in 1:n.sim){
@@ -164,21 +264,47 @@ for (ii in 1:nrow(scenario.data)){
     set.seed(allseeds[sim.nb])
 
     ## 2. simulate data and store the truth
-    sim.data <- noiseTraj(
+    browser()
+    # different cases depending on mixture of population in scenario
+    if(!is.data.frame(break.3)) {
+      break.3 <- lapply(break.3, function(x) x[4:5])
+    } else {
+      
+    }
+    sim.data <- generateData(
       true.traj, n.patients,
       score.sd, times.sd = times[["sd"]],
-      breakpoints.sd = break.3[4:5],
-
+      breakpoints.sd =,
+      
       break.min.dist = break.min.dist,
       outlier.prob = outlier.prob,
       na.prob = na.prob,
-      n.trail = n.trail
-    )
+      n.trail = n.trail,
+      mixed = mixed.scenar
+    )  
+    
+    if (!mixed) {
+      sim.data <- noiseTraj(
+        true.traj, n.patients,
+        score.sd, times.sd = times[["sd"]],
+        breakpoints.sd = break.3[4:5],
+  
+        break.min.dist = break.min.dist,
+        outlier.prob = outlier.prob,
+        na.prob = na.prob,
+        n.trail = n.trail,
+        mixed = is.list(n.obs)
+      )    
+      
+      # store individual level truth
+      true.parameters[
+        true.parameters$simID == sim.nb, c("patientID", "break.x1", "break.y1")
+      ] <- sim.data$sim.gen.model[,c("ID", "break.x1", "break.y1")]
+    } else if (mixed) {
+      
+    }
 
-    # store individual level truth
-    true.parameters[
-      true.parameters$simID == sim.nb, c("patientID", "break.x1", "break.y1")
-    ] <- sim.data$sim.gen.model[,c("ID", "break.x1", "break.y1")]
+
 
 
     ## 3. evaluate models

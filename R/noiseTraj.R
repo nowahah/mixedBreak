@@ -65,6 +65,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   }
   
   # extract information contained in 'trueTraj' object
+  # browser()
   breakpoints <- cbind(true.traj$breakpoints, breakpoints.sd)
   times <- list(value = true.traj$times, sd = times.sd)
   
