@@ -71,14 +71,19 @@ levels(scenario.data$scenarLabel) <- paste0("(", 1:nrow(scenario.data), ") ",
 
 ## Notations and definitions
 
-In general, the hat $\hat$ notation will be reserved for estimates.
+The parameter of interest is the time coordinate of the breakpoint, noted as $\psi$.
+The hat $\hat\psi$ notation will be reserved for estimates, (_i.e._ point estimate)
+
+
+Useful definitions are listed below:
 
 - A Data Generating Mechanism (DGM), or scenario
-- 
+- Plateau model - corresponds to which model/equation
+- Mixed model - corresponds to which model/equation
 - $\psi,\hat\psi_i$ resp. the true breakpoint value and its population-level estimate on dataset nb $i$,
 - $\hat\psi_i$ the 
 - $\hat\sigma_{\hat\psi}$ the empirical standard error (SE) of the breakpoint estimate
-- The Monte Carlo Standard Error (Monte Carlo SE / MCSE) helps quantifying the uncertainty due to the finite number of repetitions done in the simulation study.
+- The Monte Carlo Standard Error (Monte Carlo SE / MCSE) helps quantifying the uncertainty om the performance's measurements point estimate. This uncertainty comes from the finite number of repetitions done in the simulation study.
 
 
 
@@ -94,28 +99,12 @@ The first reported outcome are missing values counts and rates. We made a prior 
 
 ## _segmented.lme_
 
-<!-- ### Overall rate -->
-
-<!-- ```{r err_lme} -->
-<!-- estimates.seglme %>%  -->
-<!--   select(simID, error) %>% -->
-<!--   distinct() %>%  -->
-<!--   summarise(error.pct = round(100*sum(!is.na(error))/n(), 2), -->
-<!--             error.nb = sum(!is.na(error))) %>% -->
-<!--   gt() %>% -->
-<!--   tab_header(title = "Missing estimates counts and rates", -->
-<!--              subtitle = " Method 'segmented.lme'") %>% -->
-<!--   opt_row_striping(row_striping = TRUE) -->
-<!-- ``` -->
-
-<!-- The overall rate of missing values for method _segmented.lme_ is 16.3%. On average, the number of missing values is below the one we expected (20%). However, scenario-wise, we have the following distribution: -->
-
 ### Scenario-wise rate
 
 The distribution of missing estimates for every DGM is the following
 
-```{r err_lme_scenar}
-estimates.seglme %>% 
+```{r err_lme_scenar, fig.cap="Distribution and reason for error during estimation of segmented.lme"}
+err_lme_scenar <- estimates.seglme %>% 
   select(simID, error) %>% 
   distinct() %>% 
   left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
@@ -124,16 +113,29 @@ estimates.seglme %>%
   group_by(scenarLabel) %>%
   summarise(error.pct = round(100*sum(!is.na(error))/n(), 2),
             error.nb = sum(!is.na(error)),
-            power.ok = (error.pct<20)) %>%
-  gt(rowname_col = "scenarLabel") %>%
+            power.ok = (error.pct<=20))
+
+gt(err_lme_scenar %>% select(scenarLabel, error.pct, error.nb), 
+   rowname_col = "scenarLabel") %>%
+  tab_stubhead(label = md("**DGM**")) %>%
+  cols_align(align = "left", columns = scenarLabel) %>%
+  tab_options(table.font.size = 12) %>%
+  opt_stylize(style = 1, color = "cyan") %>%
   tab_header(
     title = "Missing estimates counts and rates",
     subtitle = "Method 'segmented.lme' - Distribution per DGM (n.sim=594)"
   ) %>%
   tab_stubhead(label = "DGM") %>%
-  opt_row_striping(row_striping = TRUE)
-  # TODO - add red highlight if error rate too high ?
+  opt_row_striping(row_striping = TRUE) %>%
+  # add red highlight if error rate too high
+  tab_style(
+    style = cell_fill(color = "#FFD6D7"),
+    locations = cells_body(
+      columns = starts_with("error."),
+      rows = !err_lme_scenar$power.ok )
+  )
 ```
+
 
 There is a very high disparities in terms of missing data depending on the running scenario. 4 out of the 14 scenarios do not have enough successful repetitions to conclude at the desired Monte Carlo power on the coverage probability.
 
@@ -143,7 +145,8 @@ There is a very high disparities in terms of missing data depending on the runni
 
 Strictly speaking, two different reasons con be invoked for explaining _segmented.lme_'s missing values, albeit they are both related to a singularity during the model estimation:
 
-```{r err_lme_reasons}
+<center>
+```{r err_lme_reasons, fig.cap="Error distribution and reasons for method 'segmented.lme'"}
 error.lme <- estimates.seglme %>% 
   select(simID, error) %>% 
   distinct() %>%
@@ -152,37 +155,20 @@ error.lme <- as.factor(error.lme$error)
 # levels(error.lme) # aggregate identical error (up to a certain irrelevant value)
 levels(error.lme) <- c("nlminb problem, singular convergence (7)", 
                        rep(substr(levels(error.lme)[2], 0, 34), nlevels(error.lme)-1))
-knitr::kable(table(error.lme), align = 'll')
+knitr::kable(table(error.lme), align = 'll',
+             format = "html", table.attr = "style='width:50%;'")
 ```
+</center>
 
-These errors came from the preliminary mixed model used for initializing the _segmented.lme_ method (CHECK IT). It indeed is a weakness of the method, namely because the initial mixed model is always miss-specified (no breakpoint is taken into account initially).
+These errors came from the preliminary mixed model used for initializing the _segmented.lme_ method (CHECK IT). It is indeed a weakness of the method, namely because the initial mixed model is always miss-specified (no breakpoint is taken into account initially).
 
 
 ## _segreg_
 
-<!-- ### Overall rate -->
-
-<!-- ```{r err_segreg} -->
-<!-- estimates.segreg %>%  -->
-<!--   select(simID, error) %>%  -->
-<!--   distinct() %>%  -->
-<!--   summarise(error.pct = round(100*sum(!is.na(error))/n(), 2), -->
-<!--             error.nb = sum(!is.na(error))) %>% -->
-<!--   gt() %>% -->
-<!--   tab_header( -->
-<!--     title = "Overall missing values count and rate", -->
-<!--     subtitle = "Method 'segreg'" -->
-<!--   ) %>% -->
-<!--   opt_row_striping(row_striping = TRUE) -->
-<!-- ``` -->
-
-<!-- The number of missing estimates is mostly reasonable for method _segreg_, with an overall rate of 2.63%.  -->
-
-
 ### Scenario-wise rate
 
 ```{r err_segreg_scenar}
-estimates.segreg %>% 
+err_segreg_scenar <- estimates.segreg %>% 
   select(simID, error) %>% 
   distinct() %>% 
   left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
@@ -191,17 +177,28 @@ estimates.segreg %>%
   group_by(scenarLabel) %>%
   summarise(error.pct = round(100*sum(!is.na(error))/n(), 2),
             error.nb = sum(!is.na(error)),
-            power.ok = (error.pct<20)) %>%
-  gt(rowname_col = "scenarLabel") %>%
+            power.ok = (error.pct<=20))
+
+gt(err_segreg_scenar %>% select(scenarLabel, error.pct, error.nb), 
+   rowname_col = "scenarLabel") %>%
   tab_header(
     title = "Missing values count and rate per scenario",
     subtitle = "Method 'segreg'"
   ) %>%
-  tab_stubhead(label = "DGM") %>%
-  opt_row_striping(row_striping = TRUE)
+  tab_stubhead(label = md("**DGM**")) %>%
+  cols_align(align = "left", columns = scenarLabel) %>%
+  tab_options(table.font.size = 12) %>%
+  opt_stylize(style = 1, color = "cyan") %>%
+  opt_row_striping(row_striping = TRUE) %>%
+  tab_style(
+    style = cell_fill(color = "#FFD6D7"),
+    locations = cells_body(
+      columns = starts_with("error."),
+      rows = !err_segreg_scenar$power.ok )
+  )
 ```
 
-Most unsurprisingly, the number of missing values remains below for every scenario in this case, ranging from 0.17% to at most 8.25%. Since the model is patient-wise, the more patient in a dataset, the more errors could happen for this method, so the higher rate of missing values for scenario $n_{obs}=100$ is just an artifact rather than actual limitations at the individual level.
+The number of missing values remains below for every scenario in this case, ranging from 0.17% to at most 8.25%. Since the model is patient-wise, the more patient in a dataset, the more errors could happen for this method, so the higher rate of missing values for scenario $n_{obs}=100$ is just an artifact rather than actual limitations at the individual level.
 
 In particular, the convergence of the model is sensible to the starting values of the breakpoint With real data, in case it does not work in the first try, one could always visually inspect the scatter plot to provide a better initial guess to the model.
 
@@ -209,8 +206,9 @@ In particular, the convergence of the model is sensible to the starting values o
 
 ### Error sources
 
-4 different kinds of errors occured for this method:
+4 different kinds of errors occurred for this method:
 
+<center>
 ```{r err_segreg_reasons}
 error.segreg <- estimates.segreg %>% 
   select(simID, error) %>% 
@@ -227,6 +225,7 @@ levels(error.segreg2) <- c(
 )
 knitr::kable(table(error.segreg2), align = 'll') 
 ```
+</center>
 
 At least two errors that could have been prevented with a robust code:
 
@@ -239,6 +238,7 @@ However, these were not encountered during the test run.
 
 The following table presents the joint distribution of missing estimates:
 
+<center>
 ```{r err_compare}
 error.distrib <- estimates.seglme %>%
   select(simID, error) %>% 
@@ -255,10 +255,11 @@ error.distrib <- estimates.seglme %>%
   )
 knitr::kable(table(error.distrib %>% select(starts_with("fail."))), align = rep('c', 2))
 ```
+</center>
 
 19 datasets produced missing estimates for both methods (<0.25%), suggesting that errors in both methods happened independently. Datasets produced under failed repetitions have not been examined.
 
-<!-- ## TODO - Explore datasets from which an error has occurred -->
+<!-- ## Data produced under failed repetitions -->
 <!-- ```{r err_explore} -->
 <!-- error.seed <- all.seeds[error.distrib$simID] -->
 <!-- ``` -->
@@ -283,7 +284,7 @@ This graph aims at having an overview of the breakpoint estimates distribution, 
 
 The distribution of the estimated breakpoints $\hat\psi$ for the reference scenario is plotted below:
 
-```{r est_dist.lme, warning=FALSE}
+```{r est_dist.lme, warning=FALSE, fig.align='center'}
 dataset1 <- estimates.seglme %>% 
   select(simID, break.avg) %>%
   distinct() %>% 
@@ -311,7 +312,7 @@ The distribution of estimated breakpoint is notably right-skewed, with the true 
 
 Most importantly, the scenario-wise distribution is the following:
 
-```{r est_dist.lme.dgm, warning=FALSE}
+```{r est_dist.lme.dgm, warning=FALSE, fig.align='center'}
 dataset1.lme <- estimates.seglme %>% 
   select(simID, break.avg) %>% 
   distinct() %>% 
@@ -339,13 +340,27 @@ For the mixed model method, it visually looks like high standard deviation on th
 
 This observation is consistent with our hypothesis: because the plateau is not enforced into the mixed model, it might be that a positive slope is estimated in the second phase of the relationship between response and time (the true data being constant, it is mostly unlikely that the model estimates a negative slope). This additional degree of freedom induces bias by underestimating the breakpoint time coordinate $\hat{\psi}$.
 
-TODO - REPORT SECOND PHASE SLOPES
 
+```{r slope2, fig.align='center'}
+ggplot(estimates.seglme %>% 
+         left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
+         left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID"), 
+  aes(x=slope2, y=-1/2)) +
+  geom_boxplot() +
+  geom_density(aes(x = slope2), inherit.aes = FALSE) +
+  facet_wrap(~scenarLabel) +
+  geom_vline(xintercept = 0, linetype="dashed") +
+  labs(title = "Distribution of second-phase slope for 'segmented.lme'") +
+  xlab("Second-phase slope value (SDI/time)") +
+  ylab("")
+```
+
+We can notice that the distribution of the second phase slope is concentrated in the positive range, consistently with the formulated hypothesis.
 
 
 ### _segreg_
 
-```{r est_dist.segreg.dgm, warning=FALSE}
+```{r est_dist.segreg.dgm, warning=FALSE, fig.align='center'}
 dataset1.segreg <- estimates.segreg %>% 
   group_by(simID) %>%
   summarise(
@@ -376,7 +391,7 @@ With this plot, the goal is to try and look for correlation between the two meth
 
 The estimated breakpoint $\psi$ is represented on both axis, each axis corresponding to one of the two methods.
 
-```{r biv_plot, warning=FALSE}
+```{r biv_plot, warning=FALSE, fig.align='center'}
 dataset2 <- estimates.segreg %>%
   group_by(simID) %>%
   summarise(est.psi.segreg = mean(break.x1)) %>%
@@ -406,7 +421,7 @@ The data pairs come from the same repetition (ie, they are estimated in the same
 
 The bivariate plot is produced in a panel for every data-generating mechanism below:
 
-```{r biv_plot.dgm, fig.width=10, warning=FALSE}
+```{r biv_plot.dgm, fig.width=10, warning=FALSE, fig.align='center'}
 dataset2.scenar <- dataset2 %>%
   group_by(scenarLabel) %>%
   mutate(rho = cor(est.psi.segreg, est.psi.seglme, use = "na.or.complete"),
@@ -440,7 +455,7 @@ Under or over coverage typically arises in one of two situations:
 
 ### _segmented.lme_
 
-```{r zip_plot.seglme, fig.width=10, warning=FALSE}
+```{r zip_plot.seglme, fig.width=10, warning=FALSE, fig.align='center'}
 seglme.df <- estimates.seglme %>%
   group_by(simID) %>%
   summarise(break.avg = first(break.avg),
@@ -455,30 +470,30 @@ segreg.df <- estimates.segreg %>%
             break.CI95.low = mean(break.CI95.low),
             break.CI95.up = mean(break.CI95.up))
 
-# dataset with z.score for zip plots (TODO - patch z score ?)
+# dataset with z.score for zip plots
 dataset <- seglme.df %>%
   bind_rows(segreg.df, .id = "method") %>%
   mutate(method = if_else(method==1, "segmented.lme", "segreg")) %>%
   left_join(true.parameters %>% select(simID, scenarID) %>% distinct(),
             by = "simID") %>%
-  left_join(scenario.data %>% select(scenarID, scenarLabel), by= "scenarID") # %>%
-  # group_by(scenarLabel) %>%
-  # mutate(z.score = (break.avg - TRUE.PSI)/break.x1.sd,
-  #        z.rank = rank(abs(z.score))/n(),
-  #        contains = TRUE.PSI > break.CI95.low & TRUE.PSI < break.CI95.up)
-# 
-# p <- ggplot(dataset %>% filter(method=="segmented.lme"),
-#        aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up,
-#            colour = contains)) +
-#   geom_segment() +
-#   facet_wrap(~scenarLabel) +
-#   geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
-#   geom_hline(yintercept = 0.95, linetype = "dashed") +
-#   labs(colour = "") +
-#   xlab("95% confidence intervals") +
-#   ylab("Fractional centiles of |z-score|") +
-#   scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
-#   theme(legend.position = "bottom")
+  left_join(scenario.data %>% select(scenarID, scenarLabel), by= "scenarID") %>%
+  group_by(scenarLabel, method) %>%
+  mutate(z.score = (break.avg - TRUE.PSI)/break.x1.sd,
+         z.rank = rank(abs(z.score))/n(),
+         contains = TRUE.PSI > break.CI95.low & TRUE.PSI < break.CI95.up)
+
+p <- ggplot(dataset %>% filter(method=="segmented.lme" & !is.na(contains)),
+       aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up,
+           colour = contains)) +
+  geom_segment() +
+  facet_wrap(~scenarLabel) +
+  geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
+  geom_hline(yintercept = 0.95, linetype = "dashed") +
+  labs(title = "Zip plot for method 'segmented.lme' for every DGM", colour = "") +
+  xlab("95% confidence intervals") +
+  ylab("Fractional centiles of |z-score|") +
+  scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
+  theme(legend.position = "bottom")
 
 seglme.res <- simsum(
   dataset %>% filter(method=="segmented.lme"),
@@ -489,35 +504,42 @@ seglme.res <- simsum(
   ci.limits = c("break.CI95.low", "break.CI95.up"),
   x = TRUE # necessary for zip plots
 )
-# 
-# cover.conf.int <- seglme.res$summ %>%
-#   filter(stat == "cover") %>% 
-#   mutate(cover.95.low = est + qnorm(0.025)*mcse,
-#          cover.95.up = est - qnorm(0.025)*mcse) %>% 
-#   group_by(scenarLabel)
 
-# p +
-#   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.low), 
-#              linetype = "dashed", linewidth = 1.2, colour = "yellow") + 
-#   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up), 
-#              linetype = "dashed", linewidth = 1.2, colour = "yellow") +
-#   ylim(c(0.5, 1))
+cover.conf.int <- seglme.res$summ %>%
+  filter(stat == "cover") %>%
+  mutate(cover.95.low = est + qnorm(0.025)*mcse,
+         cover.95.up = est - qnorm(0.025)*mcse) %>%
+  group_by(scenarLabel)
 
-autoplot(seglme.res, type="zip") + # zip plot !
-  labs(title = "Zip plot for method 'segmented.lme' for every DGM")
+p +
+  geom_hline(data = cover.conf.int, aes(yintercept = cover.95.low),
+             linetype = "dashed", linewidth = 1.2, colour = "yellow") +
+  geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up),
+             linetype = "dashed", linewidth = 1.2, colour = "yellow")
+
+# autoplot(seglme.res, type="zip") + # zip plot !
+#   labs(title = "AUTOPLOT zip plot for method 'segmented.lme' for every DGM")
 # TODO - is there a scale problem on the panel in which the |z-score| fraction 
 # does not reach 1 ? I would say yes, fractional z should be computed for every DGM!
 # FIX |z|-scale issue
+# UPDATE 28-05: everything is working except the z-scale which is still cursed
 
-# plot.data <- autoplot(seglme.res, type="zip")@data
-# pp <- plot.data %>% 
-#   select(scenarLabel:simID, z, lower:upper, rank) %>%
-#   ggplot()
-# pp +
-#   geom_segment(aes(y=z.frac.rank, x=lower, xend=upper, colour=)) +
-#   facet_wrap(~scenarLabel)
-# # zip plot mystery...
-
+if(F){
+  plot.data <- autoplot(seglme.res, type="zip")@data
+  pp <- plot.data %>%
+    select(scenarLabel:simID, z, lower:upper, rank) %>%
+    mutate(coverer = (lower < TRUE.PSI) & (TRUE.PSI < upper)) %>%
+    ggplot()
+  pp <- pp +
+    geom_segment(aes(y=rank, x=lower, xend=upper, colour=coverer)) +
+    facet_wrap(~scenarLabel) +
+    labs(title = "Zip plot for method 'segmented.lme' for every DGM")
+  pp +
+    geom_hline(aes(yintercept = lower/100), linetype = "dashed", linewidth = 1.2,
+               colour = "yellow") +
+    geom_hline(aes(yintercept = upper/100), linetype = "dashed", linewidth = 1.2,
+                   colour = "yellow")
+}
 ```
 
 Blue CIs are coverers (_ie_ they include the true value $\psi=77$), red CIs are non-coverers (_ie_ they do not include the true value $\psi$). The yellow dashed lines represents the confidence interval on the coverage probability estimate.
@@ -532,7 +554,7 @@ Since we already know about the substantial bias on the breakpoint estimate $\ha
 ### _segreg_
 
 
-```{r zip_plot.segreg, fig.width=10, warning=FALSE}
+```{r zip_plot.segreg, fig.width=10, warning=FALSE, fig.align='center'}
 segreg.res <- simsum(
   dataset %>% filter(method=="segreg"), 
   estvarname = "break.avg", 
@@ -623,27 +645,6 @@ One can only notice the substantial and significant bias that the mixed model su
 This observation has to be tempered by the fact that we reported the population-level breakpoint $\hat\psi_i$. The individual breakpoints $\hat\psi_{ij}$ might demonstrates other properties for the same performance measurements.
 
 
-<!-- ```{r lolli_cover} -->
-<!-- # APPENDIX? -->
-<!-- autoplot(summ, stats = "cover", type = "lolly") + -->
-<!--   labs(title = TeX("Coverage probability for \\hat{\\psi}"), -->
-<!--        subtitle = "For both methods and every DGM") + -->
-<!--   xlab("Coverage probability estimate (CI95%)") -->
-<!-- ``` -->
-
-
-
-<!-- ```{r lolli_becover} -->
-<!-- # APPENDIX - easier to comment with the numbers -->
-<!-- autoplot(summ, stats = "becover", type = "lolly")  + -->
-<!--   labs(title = TeX("Bias-eliminated coverage for \\hat{\\psi}"), -->
-<!--        subtitle = "For both methods and every DGM") + -->
-<!--   xlab("Bias eliminated coverage probability estimate (CI95%)") -->
-<!-- ``` -->
-
-We can assess the negative impact of bias on the coverage probability, though it clearly remains a substantial undercoverage, with an important variability across scenarios.
-
-
 
 ## Performance measurements table
 
@@ -682,7 +683,6 @@ formatted.res %>%
     row_group_as_column = TRUE
   ) %>%
   tab_header(title = "Performance measurements per method and DGM (MCSE in parenthesis)") %>%
-  # tab_caption("values (MCSE) - green cells indicates that the target value is reached for the performance measure ") %>%
   tab_stubhead(label = md("**DGM**")) %>%
   cols_align(align = "left", columns = scenarLabel) %>%
   tab_spanner(label=md("**Bias**"), columns=ends_with("_bias")) %>%
@@ -770,3 +770,26 @@ TODO - To discuss:
 
 
 
+
+
+
+<!-- APPENDIX -->
+
+
+<!-- ```{r lolli_cover} -->
+<!-- # APPENDIX? -->
+<!-- autoplot(summ, stats = "cover", type = "lolly") + -->
+<!--   labs(title = TeX("Coverage probability for \\hat{\\psi}"), -->
+<!--        subtitle = "For both methods and every DGM") + -->
+<!--   xlab("Coverage probability estimate (CI95%)") -->
+<!-- ``` -->
+
+
+
+<!-- ```{r lolli_becover} -->
+<!-- # APPENDIX - easier to comment with the numbers -->
+<!-- autoplot(summ, stats = "becover", type = "lolly")  + -->
+<!--   labs(title = TeX("Bias-eliminated coverage for \\hat{\\psi}"), -->
+<!--        subtitle = "For both methods and every DGM") + -->
+<!--   xlab("Bias eliminated coverage probability estimate (CI95%)") -->
+<!-- ``` -->

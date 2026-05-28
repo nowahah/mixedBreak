@@ -2,6 +2,7 @@
 source/*
 data/*
 inst/*.html
+inst/*_files/*
 
 # History files
 .Rhistory

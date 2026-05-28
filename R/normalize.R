@@ -37,7 +37,8 @@ normalize.segmented.lme <- function(x){
     breaks.CI95.low = confint(x)[1,'G0'],
     breaks.CI95.up = confint(x)[2,'G0'],
     intercept = x$lme.fit$coefficients$random$id[,"(Intercept)"] + 
-      x$lme.fit$coefficients$fixed["time"] * as.numeric(x$psi.i)
+      x$lme.fit$coefficients$fixed["time"] * as.numeric(x$psi.i),
+    slope2 = sum(x$lme.fit$coefficients$fixed[c("time", "U")])
     # break.intercept = intercept.rd + time*break.x.rd
   )
   
