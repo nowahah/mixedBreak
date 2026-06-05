@@ -1,8 +1,9 @@
 # Original data files should not be exported
 source/*
 data/*
-inst/*.html
-inst/*_files/*
+inst/*
+!inst/*.Rmd
+!inst/*.docx
 
 # History files
 .Rhistory

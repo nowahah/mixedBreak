@@ -160,7 +160,7 @@ for (ii in 1:nrow(scenario.data)){
     # if (sim.nb!=11) next
 
     ## 0. update 'progress bar' information
-    if (sim.nb %% 10 == 0 | sim.nb %in% c(2, nsimAll)){ print(paste(sim.nb, "/", nsimAll)) }
+    if (sim.nb %% 100 == 0 | sim.nb %in% c(2, nsimAll)){ print(paste(sim.nb, "/", nsimAll)) }
 
     ## 1. set seed
     set.seed(allseeds[sim.nb])
@@ -208,10 +208,11 @@ for (ii in 1:nrow(scenario.data)){
     if(all(is.na(estimates.seglme[estimates.seglme$simID == sim.nb, 'error']))){
       tryCatch(
         {
-          # browser()
+          browser()
           mod.seg.lme <- segmented.lme(
             mod.lme, ~time,
             random = list(ID = pdDiag(~1+G0))
+            # , control = seg.control(n.boot=25L)
           )
         },
         error = function(e){
@@ -223,7 +224,7 @@ for (ii in 1:nrow(scenario.data)){
       )
     }
 
-    #  3.2. segmented (with apply)
+    #  3.2. segreg (with apply)
     tryCatch(
       {
         mod.segreg <- sim.data$sim.dataset %>%
@@ -247,10 +248,9 @@ for (ii in 1:nrow(scenario.data)){
     ## 4. store results / errors
     # 4.1. segmented.lme results
     if(all(is.na(estimates.seglme[estimates.seglme$simID==sim.nb, 'error']))){
-
+      
       res.seg.lme <- normalize(mod.seg.lme)
       # population level values
-      # browser()
       col.estimates.seglme <- c(paste0("break.", c("avg", "x1.sd", "x1.random", "CI95.low", "CI95.up")), "slope2")
       col.res.seg.lme <- c(paste0("breaks.", c("avg", "sd", "random.sd","CI95.low", "CI95.up")), "slope2")
       estimates.seglme[estimates.seglme$simID==sim.nb, col.estimates.seglme] <- matrix(
@@ -258,14 +258,14 @@ for (ii in 1:nrow(scenario.data)){
         nrow = n.patients, ncol = length(col.res.seg.lme), byrow = T
       )
       # individual breakpoint coordinates
-      # browser()
       estimates.seglme[estimates.seglme$simID==sim.nb, paste0("break.", c("x1", "y1"))] <- 
         unlist(res.seg.lme[c("breaks.ind", "intercept")], use.names = F)
     }
     
     # 4.2. segreg results
     if(all(is.na(estimates.segreg[estimates.segreg$simID==sim.nb, 'error']))){
-
+      
+      browser()
       res.segreg <- normalize(mod.segreg)
 
       # only individual level values
@@ -289,12 +289,12 @@ rm(res.segreg, res.seg.lme, mod.segreg, mod.lme, mod.seg.lme)
 
 print("Simulation study lasted for:")
 print(end.time-start.time)
-# Time difference of 9.825832 hours
+# Time difference of 10.48273 hours
 # print("Average time/iteration:")
 # print((end.time-start.time)/nsimAll)
 # print("Estimated simulation study duration (in hours):")
-# print((end.time-start.time)/nsimAll*n.scenario*559/60)
-# Estimated ~8h of simulation
+# print((end.time-start.time)/nsimAll*n.scenario*594/60)
+# Estimated ~8.5h of simulation
 
 
 ## WRITING RESULTS IN FILE
