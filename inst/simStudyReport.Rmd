@@ -3,9 +3,7 @@ title: 'Evaluating existing statistical methods for linear segmented relationshi
   A Simulation Study'
 author: "Noah Degoulange"
 date: "`r Sys.Date()`"
-output:
-  bookdown::html_book:
-    theme: united
+output: bookdown::html_document2
 editor_options: 
   chunk_output_type: console
 bibliography: "biblio.bib"
@@ -14,7 +12,8 @@ bibliography: "biblio.bib"
 
 ```{r setup, include=FALSE, fig.align='center'}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak")
+getwd()
+# knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak")
 ```
 
 
@@ -32,18 +31,18 @@ library(rsimsum)    # analyze/plot results from simulation study
 
 
 ```{r load_results, include=FALSE}
-estimates.seglme <- read_excel("data/esimates_seglme.xlsx")
-estimates.segreg <- read_excel("data/esimates_segreg.xlsx", guess_max = 10000L)
-true.parameters <- read_excel("data/true_parameters.xlsx", sheet = "true.parameters")
-scenario.data <- read_excel("data/true_parameters.xlsx", sheet = "scenario.data")
-all.seeds <- read_excel("data/random_seed.xlsx", sheet = "all.seeds")$allseeds
+estimates.seglme <- read_excel("../data/esimates_seglme.xlsx")
+estimates.segreg <- read_excel("../data/esimates_segreg.xlsx", guess_max = 10000L)
+true.parameters <- read_excel("../data/true_parameters.xlsx", sheet = "true.parameters")
+scenario.data <- read_excel("../data/true_parameters.xlsx", sheet = "scenario.data")
+all.seeds <- read_excel("../data/random_seed.xlsx", sheet = "all.seeds")$allseeds
 # ending.seed <- read_excel("data/random_seed.xlsx", sheet = "ending.seed")$ending.seed
 # restore with .GlobalEnv$.Random.seed <- ending.seed
 TRUE.PSI <- 77
 ```
 
 
-```{r compute_label, include=FALSE}
+```{r compute-label, include=FALSE}
 ref.ind <- which(scenario.data$fac.var=="REFERENCE")
 scenario.data$fac.var[ref.ind] <- scenario.data$fac.var[ref.ind-1]
 scenarLabel <- character(nrow(scenario.data))
@@ -75,53 +74,68 @@ The aim of this simulation study is to evaluate and compare already implemented 
 
 Two already implemented statistical methods are to be compared in this study:
 
-1. A linear mixed model with an estimated breakpoint. (`segmented` R package, function `segmented.lme` - ref: https://doi.org/10.1177/1471082X13504721). This statistical method only allows for a single breakpoint in the relationship between the outcome and the segmented exploratory variable. It cannot enforce a plateau in the second phase, so the second phase coefficient might differ from zero. We will refer to it as `segmented.lme` or the 'mixed model', in the absence of ambiguity. The model's equation is:
+1. A linear mixed model with an estimated breakpoint. (`segmented` R package, function `segmented.lme` - ref: https://doi.org/10.1177/1471082X13504721). This statistical method only allows for a single breakpoint in the relationship between the outcome and the segmented exploratory variable. The model's equation is:
 $$
 \forall i \in [\![1,n]\!], \forall j \in [\![1,n_i]\!], \hspace{5mm}
 y_{ij} = \beta_{1} t_{ij} + \beta_{2} (t_{ij} - \psi_i)_+ + \varepsilon_{ij}
 $$
-With $\varepsilon_{ij} \overset{iid}{\sim} \cal{N}(0, \sigma_\varepsilon^2)$, and the breakpoints $\psi_i$ are modeled as:
+Of note, $\beta_2$ is not forced to be the opposite of $\beta_1$, and therefore the model does not enforce a plateau in the second phase. Namely, the second phase coefficient might differ from zero. We will refer to it as `segmented.lme` or the 'mixed model', in the absence of ambiguity. With $\varepsilon_{ij} \overset{iid}{\sim} \cal{N}(0, \sigma_\varepsilon^2)$, and the breakpoints $\psi_i$ are modeled as:
 $$
 \forall i \in [\![1,n]\!], \hspace{5mm}
 \psi_i = \frac{a_1 + a_2 \exp(\kappa + k_i)}{1 + \exp(\kappa + k_i)}
 $$
-on the logit scale with $(a_1, a_2) = range(t_{ij})$ and $k_i \overset{iid}{\sim} \cal{N}(0, \tau^2) \perp \varepsilon_{ij}$. Though the absence of random effects on the time slopes may look surprising, it appears in practice that the value of their associated variance is not significant. The random effect $k_i$ on the breakpoint estimate is of great interest to evaluate between subjects disparities in breakpoint value.
+on the logit scale with 
+$(a_1, a_2) = range \left( \{t_{ij}\}_{i \in [\![1,n]\!], j \in [\![1,n_i]\!]} \right)$ and 
+$k_i \overset{iid}{\sim} \cal{N}(0, \tau^2) \perp \varepsilon_{ij}$. 
+The variance $\tau^2$ of the random effect $k_i$ on the breakpoint estimate is of great interest to evaluate between subjects disparities in breakpoint value.
 
 2. A linear model with breakpoint estimation (`segmented` R package, function `segreg` - ref: https://doi.org/10.1002/sim.1545). This model is patient-wise (it estimates parameters using a single patient’s data). It enforces a plateau phase in the second segment. We will refer to it as `segreg` or the 'plateau model'. The model's equation for a single patient is the following:
+
 $$
-\forall j \in [\![1,T]\!], \hspace{5mm}
-y_{j} = \beta_{1} t_{j} - \beta_{1} (t_{j} - \psi)_+ + \varepsilon_{j}
-= \beta_{1} (t_{j} - (t_{j} - \psi)_+) + \varepsilon_{j}
+\begin{split}
+\forall i \in [\![1,n]\!], \forall j \in [\![1,n_i]\!], \hspace{5mm}
+y_{ij} & = \beta_{1i} t_{ij} - \beta_{1i} (t_{ij} - \psi_i)_+ + \varepsilon_{ij} \\
+& = \beta_{1i} (t_{ij} - (t_{ij} - \psi_i)_+) + \varepsilon_{ij}
+\end{split}
 $$
-With the slope coefficient and the breakpoint being independently estimated for every patient, and the Gaussian-noise assumption $\varepsilon_{j} \overset{iid}{\sim} \cal{N}(0, \sigma_\varepsilon^2)$. 
-In the second phase the outcome is modeled as a constant $\forall j \hspace{2mm} \text{s.t.} \hspace{2mm} t_j > \psi, \hspace{2mm} y_j \approx \beta_1 \psi$.
+
+With the first segment slope coefficient $\beta_{1i}$ and the breakpoint $\psi_i$ being independently estimated for every patient (_i.e._ NO random effects), and the Gaussian-noise assumption $\varepsilon_{ij} \overset{iid}{\sim} \cal{N}(0, \sigma_{i,\varepsilon}^2)$.
+In the second phase the outcome is modeled as a constant: $\forall i,j \hspace{2mm} \text{s.t.} \hspace{2mm} t_{ij} > \psi_i, \hspace{2mm} \mathbb{E}[y_{ij}|t_{ij}] = \beta_{1i} \psi_i$.
 
 
 
 ## Notations and definitions
 
-The simulated data follows a "10" pattern, that is, a 2-segment linear relationship between the response and the explanatory variable, with the first segment having a non-zero slope, and the second segment being a plateau (null slope). The following notations will be useful:
+The simulated data follows a "10" pattern, that is, a 2-segments linear relationship between the response and the explanatory variable, with the first segment having a non-zero slope, and the second segment being a plateau (null slope). The pattern is illustrated in the figure below:
 
-TODO - INSERT FIGURE WITH ALL NOTATIONS:
-
-```{r notations, cache=FALSE}
-knitr::include_graphics("inst/gg-10-pattern-notations.png")
+```{r fig-notation, fig.cap="'10', data example and notations ($\\beta_1=1, \\psi=0.6$)", fig.align="center"}
+knitr::include_graphics(here::here("inst/figs/gg-10-pattern-notations.png"))
 ```
 
+In addition to some elements on the data generating mechanism, the following notations will be useful:
 
-<!-- ![Figure 1 - '10' data example with notations](/indirect/student/noahdegoulange/figures/simStudy/gg-10-pattern-notations.png) -->
+- $\beta_1$, (resp. $\beta_{1i}$) refers to the first segment slope coefficient at the population level (resp. individual level);
+- $T_{peak}$ is the duration of the plateau phase / second segment;
+- $\psi=77$ is the average true value of the generated breakpoints. It is the parameter of interest in this simulation study. $\psi_d$ is the true average breakpoint for dataset $d$. In this study $\forall d, \psi_d=\psi$ is not varying across data-generating mechanism;
+- $\psi_{di}$ is the true breakpoint specific to subject $i$ in dataset $d$. It follows a $\cal{LogNormal}$ distribution with mean $\psi$ and variance $\sigma_{\psi_d}^2$. All subject-specific breakpoints are independent and identically distributed;
+- The hat notation ($\hat\psi_d, \hat{\psi}_{di}, \hat{\beta_1},\hat{\beta_{1i}}$) will be reserved for the estimates, or their modeled standard error (SE) with the letter $\hat{s}$:
+  - $\hat{s}(\hat{\psi_d})$ is the estimated breakpoint SE;
+  - $\hat{s}(\hat{\beta_1})$ is the estimated first-segment slope SE; 
+  - $\hat{\tau}(\hat{\beta_1})$ is the estimated breakpoint random effect SE;
+- $\sigma_\varepsilon$ is the residual standard error on the simulated noise measurements;
+- $n_{obs}$ is the number of individual in a given dataset.
+- Data points were simulated to be measured every $\Delta t=20$ minutes from the beginning of the simulated experience to its end. A small standard deviation was added onto the time of measurements (following a normal distribution with fixed variance $\sigma_t^2=4$). Only the first measurement is always at $t=0$ minutes (because it symbolizes the beginning of the experiment).
 
-The parameter of interest in the simulation study is the time coordinate of the breakpoint, noted as $\psi$.
-The hat $\hat\psi_i$ notation will be reserved for estimates (whether the breakpoint or its standard error)
 
 
-Useful definitions are listed below:
+Additional useful definitions and notations are listed below:
 
-- A Data Generating Mechanism (DGM), or scenario, is a set of values that completely defines the way data will be generated (breakpoint mean and dispersion, residual variance, etc...) ;
-- $\psi,\hat\psi_i$ resp. the true breakpoint value and its population-level estimate on dataset nb $i$ ;
-- $\hat\psi_{ij}$ is the estimated breakpoint on dataset $i$ for individual $j$.
-- $\hat\sigma_{\hat\psi_i}$ the empirical standard error (SE) of the breakpoint estimate;
-- The Monte Carlo Standard Error (Monte Carlo SE / MCSE) helps quantifying the uncertainty om the performance's measurements point estimate. This uncertainty comes from the finite number of repetitions done in the simulation study.
+- A Data Generating Mechanism (DGM), or scenario, is a set of values that completely defines the way data will be generated. This includes: 
+  - previously introduced quantities such as $\psi_d, \sigma_{\psi_d}, T_{peak}, \sigma_\varepsilon$;
+  - the outlier probability $p_{out} \in [0,1]$: the individual probability of having exactly   one outlier observation (zero else). The underlying simulated mechanism is the following: an    outlier can occur  if the subject goes to the bathroom during the psychedelic experience,     inducing a 'drop' of 1-3 points in SDI. In practice, it happens at most once per patient;
+  - the response coordinate of the breakpoint $Y(\psi)$ and its standard deviation $\sigma_{Y(\psi)}$. The coordinates of the breakpoint fully specifies the induced first-phase slope $\beta_1=\frac{Y(\psi)}{\psi}$.
+- $n_{sim}$ is the number of repetitions (_i.e._ simulated datasets) for a given DGM;
+- The Monte Carlo Standard Error (Monte Carlo SE / MCSE) quantifies the uncertainty om the performance's measurements point estimate. This uncertainty comes from the finite number of repetitions done in the simulation study.
 
 
 
@@ -131,17 +145,17 @@ Useful definitions are listed below:
 
 
 
-# Missing values
+# Missing estimates
 
-The first reported outcome are missing values counts and rates. We made a prior assumption of an expected 20% of missing estimates to derive the number of repetitions $n_{sim}$ for each scenario.
+The first reported outcome are missing estimates counts and rates. We made a prior assumption of an expected 20% of missing estimates to derive the number of repetitions $n_{sim}$ for each scenario.
 
-## _segmented.lme_
+## `segmented.lme`
 
 ### Scenario-wise rate
 
-The distribution of missing estimates for every DGM is the following
+The distribution of missing estimates for every DGM is the following:
 
-```{r err_lme_scenar, fig.cap="Distribution and reason for error during estimation of segmented.lme"}
+```{r err-lme-scenar, fig.cap="Distribution and reasons for errors during estimation of `segmented.lme`, for all DGM ($n_{sim}=594$)"}
 err_lme_scenar <- estimates.seglme %>% 
   select(simID, error) %>% 
   distinct() %>% 
@@ -159,10 +173,10 @@ gt(err_lme_scenar %>% select(scenarLabel, error.pct, error.nb),
   cols_align(align = "left", columns = scenarLabel) %>%
   tab_options(table.font.size = 12) %>%
   opt_stylize(style = 1, color = "cyan") %>%
-  tab_header(
-    title = "Missing estimates counts and rates",
-    subtitle = "Method 'segmented.lme' - Distribution per DGM (n.sim=594)"
-  ) %>%
+  # tab_header(
+  #   title = "Missing estimates counts and rates",
+  #   subtitle = "Method `segmented.lme` - Distribution per DGM (n.sim=594)"
+  # ) %>%
   tab_stubhead(label = "DGM") %>%
   opt_row_striping(row_striping = TRUE) %>%
   # add red highlight if error rate too high
@@ -175,18 +189,20 @@ gt(err_lme_scenar %>% select(scenarLabel, error.pct, error.nb),
 ```
 
 
-There are high disparities in terms of missing data depending on the running scenario. 4 out of the 14 scenarios do not have enough successful repetitions to conclude at the desired Monte Carlo power on the coverage probability.
+There are high disparities in terms of missing data depending on the DGM. 
+4 DGM out of the 14 scenarios exhibits more than 20% of failed repetitions. This implies that we will later not be able to conclude at the desired Monte Carlo power for the point estimate of the coverage probability.
 
-They seem to be a substantial effect of simulation factors such as the number of observations $n_{obs}$, the breakpoint dispersion $\sigma_\psi$ and the duration of plateau $T_{peak}$ on the rate of missing values across DGM. We will see later that it is surprising in the light of performances results, which tends to be better across scenarios with more missing values.
+They seem to be a substantial effect of simulation factors such as the number of observations $n_{obs}$, the breakpoint dispersion $\sigma_\psi$ and the duration of plateau $T_{peak}$ on the rate of missing estimates across DGM. 
+We will see later that this observed missing estimates distribution is surprising, because the model tends to perform better across scenarios with more missing estimates.
 
 
 
 
 ### Error sources
 
-Strictly speaking, two different reasons can be invoked for explaining _segmented.lme_'s missing values, albeit they are both related to a singularity during the model estimation:
+Strictly speaking, two different reasons can be invoked for explaining `segmented.lme`'s missing estimates, albeit they are both related to a convergence error during the model estimation:
 
-```{r err_lme_reasons, fig.cap="Error distribution and reasons for method 'segmented.lme'"}
+```{r err-lme-reasons, fig.cap="Error distribution and reasons for method `segmented.lme`"}
 error.lme <- estimates.seglme %>% 
   select(simID, error) %>% 
   distinct() %>%
@@ -197,21 +213,19 @@ levels(error.lme) <- c("initial.lme | nlminb problem, singular convergence (7)",
                        rep(substr(levels(error.lme)[2], 0, 50), nlevels(error.lme)-1))
 
 knitr::kable(table(error.lme), align = 'll')
-# knitr::kable(table(error.lme), align = 'll',
-#              format = "html", table.attr = "style='width:50%;'")
 ```
 
-The majority of errors during the estimation came from the preliminary mixed model used for initializing the _segmented.lme_ method (>99%). 
+The majority of errors during the estimation came from the preliminary mixed model used for initializing the `segmented.lme` method (>99%). 
 It is a weakness of the method, namely because the initial mixed model is always miss-specified. 
 One plausible explanation could be that the situations where the data exhibits the segmented relationship the most (with a long plateau for instance) are also the ones for which the initial mixed model is "the most" miss-specified, by trying to fit a breakpoint-free pattern.
 
 
 
-## _segreg_
+## `segreg`
 
 ### Scenario-wise rate
 
-```{r err_segreg_scenar}
+```{r err-segreg-scenar}
 err_segreg_scenar <- estimates.segreg %>% 
   select(simID, error) %>% 
   distinct() %>% 
@@ -226,8 +240,8 @@ err_segreg_scenar <- estimates.segreg %>%
 gt(err_segreg_scenar %>% select(scenarLabel, error.pct, error.nb), 
    rowname_col = "scenarLabel") %>%
   tab_header(
-    title = "Missing values count and rate per scenario",
-    subtitle = "Method 'segreg'"
+    title = "Missing estimates count and rate per scenario",
+    subtitle = "Method `segreg`"
   ) %>%
   tab_stubhead(label = md("**DGM**")) %>%
   cols_align(align = "left", columns = scenarLabel) %>%
@@ -242,9 +256,8 @@ gt(err_segreg_scenar %>% select(scenarLabel, error.pct, error.nb),
   )
 ```
 
-The number of missing values remains below for every scenario in this case, ranging from 0.17% to at most 8.25%. Since the model is patient-wise, the more patient in a dataset, the more errors could happen for this method. So the higher rate of missing values for scenario $n_{obs}=100$ is just an artifact rather than actual limitations at the individual level.
+The number of missing estimates remains low for every scenario for this method, ranging from 0.17% to at most 8.25%. Since the model is patient-wise, the more patients in a dataset, the more likely errors could happen for this method. So the higher rate of missing estimates for scenario $n_{obs}=100$ is just an artifact rather than actual limitations at the individual level.
 
-In particular, the convergence of the model is sensible to the starting values of the breakpoint With real data, in case it does not work in the first try, one could always visually inspect the scatter plot to provide a better initial guess to the model.
 
 
 
@@ -252,7 +265,7 @@ In particular, the convergence of the model is sensible to the starting values o
 
 4 different kinds of errors occurred for this method:
 
-```{r err_segreg_reasons}
+```{r err-segreg-reasons, fig.cap="chunk.opt"}
 error.segreg <- estimates.segreg %>% 
   select(simID, error) %>% 
   distinct() %>%
@@ -266,16 +279,18 @@ levels(error.segreg2) <- c(
   "psi values too close each other. Please change (decreases number of) starting values",
   "starting psi out of the range"
 )
-knitr::kable(table(error.segreg2), align = 'll') 
+knitr::kable(table(error.segreg2), align = 'll', label="label") 
 ```
 
-At least two errors that could have been prevented with a more robust code, despite them not being encoutered during the test runs:
+Two errors could have probably been prevented with a more elaborated code. They were not encountered during the test runs:
 
-1. $ operator is invalid for atomic vectors. this one can only come from the selection operation on the simulated dataset on line 229 
-`mod.segreg <- sim.data$sim.dataset %>% ...`, say due to a problem in the data-generating function. However if it raised an error here, it also should have raised the exact same error earlier in the initial mixed model on line 195 (see R script `runSimulation.R`). No explanation has been found for this error occurring.
+1. $ operator is invalid for atomic vectors. 
+this one can only come from the selection operation on the simulated dataset on line 229 
+<!-- `mod.segreg <- sim.data$sim.dataset %>% ...`, say due to a problem in the data-generating function. However if it raised an error here, it also should have raised the exact same error earlier in the initial mixed model on line 195 (see R script `runSimulation.R`).  -->
+After inspection of the code, no explanation has been found for this error occurring.
 2. starting psi outside of the range (of *time* variable). This is a clear message from the `segreg` function: the initialization of breakpoint estimate yielded a value outside of the range of time (before the beginning of the experiment or after the last available data point). According to the code documentation of `segmented` package, the default initialization is equally spaced values in the range of time (in our case the middle value since we have a single breakpoint). 
 
-<!-- CHECK FOR THIS ONE: Since missing values were also simulated at random ($\mathbb{P}\{missing\} = 1/20$), a possibility is that the initial breakpoint values were computed according to the time range, regardless of the presence/absence of a corresponding score.  -->
+<!-- CHECK FOR THIS ONE: Since missing estimates were also simulated at random ($\mathbb{P}\{missing\} = 1/20$), a possibility is that the initial breakpoint values were computed according to the time range, regardless of the presence/absence of a corresponding score.  -->
 <!-- Then the breakpoint value could be compared to actual range of time with available score, raising an error. -->
 
 
@@ -283,7 +298,7 @@ At least two errors that could have been prevented with a more robust code, desp
 
 The following table presents the joint distribution of missing estimates:
 
-```{r err_compare}
+```{r err-compare}
 error.distrib <- estimates.seglme %>%
   select(simID, error) %>% 
   distinct() %>% 
@@ -320,16 +335,16 @@ Datasets produced under failed repetitions have not been examined.
 
 Before undertaking formal analysis of the performance measurements, graphical exploratory analysis will be helpful in assessing some characteristics of the simulated datasets, namely: the breakpoint time-distribution, correlation and systematic differences between methods, and issues with coverage.
 
-## Distribution of $\hat{\psi_i}$ for each method and scenario
+## Distribution of $\hat{\psi_d}$ for each method and scenario
 
-This graph aims at having an overview of the breakpoint estimates distribution, especially looking for outliers. The parameter of interest is $\psi$, the breakpoint time-location, and was simulated following a truncated log-normal distribution, with mean $\mu_\psi=77$ minutes for every data-generating mechanism (DGM, will be equally referred to as scenario).
+This graph aims at having an overview of the breakpoint estimates distribution, especially looking for outliers. The parameter of interest is $\hat\psi_d$, the breakpoint time-location, and was simulated following a truncated log-normal distribution, with mean $\psi=77$ minutes for every DGM.
 
 
-### _segmented.lme_
+### `segmented.lme`
 
-The distribution of the estimated breakpoints $\hat\psi_i$ for the reference scenario is plotted below:
+The distribution of the estimated breakpoints $\hat\psi_d$ for the reference scenario is plotted below:
 
-```{r est_dist.lme, warning=FALSE, fig.align='center'}
+```{r est-dist-lme, warning=FALSE, fig.align='center', fig.cap="Estimated $\\hat{\\psi_d}$ distribution for the reference scenario"}
 dataset1 <- estimates.seglme %>% 
   select(simID, break.avg) %>%
   distinct() %>% 
@@ -357,7 +372,7 @@ The distribution of estimated breakpoint is notably shifted to the right, with t
 
 Most importantly, the scenario-wise distribution is the following:
 
-```{r est_dist.lme.dgm, warning=FALSE, fig.align='center'}
+```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates \\hat{\\psi_d} for all DGM - method `segmented.lme`"}
 dataset1.lme <- estimates.seglme %>% 
   select(simID, break.avg) %>% 
   distinct() %>% 
@@ -370,7 +385,7 @@ ggplot(dataset1.lme , aes(x = scenarLabel, y = break.avg)) +
   geom_boxplot() +
   geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
   coord_flip() +
-  labs(title=TeX("Empirical \\hat{\\psi} distribution for every data-generating mechanism"),
+  labs(title=TeX("Empirical \\hat{\\psi} distribution for every DGM"),
        subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
   ylab(TeX("Breakpoint estimates \\hat{\\psi} distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
@@ -379,14 +394,14 @@ ggplot(dataset1.lme , aes(x = scenarLabel, y = break.avg)) +
 The labels on the _y_-axis corresponds to the parameter varying with all of the others being of the reference "cased-base" (scenario 7).
 
 This panel reflects that the right skewness is dispatched among every DGM, though is it highly tempered by the longest plateau duration ($T_{peak}=143$ minutes).
-The two notable outliers occurred for the same DGM, which has the highest residual variance ($\sigma_\varepsilon=2$) during slopes phases.
+The two notable outliers occurred for the same DGM, which has the highest residual standard deviation ($\sigma_\varepsilon=2$) during slopes phases.
 
 For the mixed model method, it visually looks like high standard deviation on the breakpoint $\sigma_\psi$ and low duration of plateau $T_{peak}$ biases the population-level estimate (under-estimation).
 
 This observation is consistent with our hypothesis: because the plateau is not enforced into the mixed model, it might be that a positive slope is estimated in the second phase of the relationship between response and time (the true data being constant, it is mostly unlikely that the model estimates a negative slope). This additional degree of freedom induces bias by underestimating the breakpoint time coordinate $\hat{\psi}$.
 
 
-```{r slope2, warning=FALSE, fig.align='center'}
+```{r slope2, warning=FALSE, fig.align='center', fig.cap="Distribution of second-segment slope ($\\beta_1+\\beta_2$) for all DGM - method `segmented.lme`"}
 ggplot(estimates.seglme %>% 
          left_join(true.parameters[, c("simID", "scenarID")] %>% distinct(), by="simID") %>% 
          left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID"), 
@@ -394,7 +409,7 @@ ggplot(estimates.seglme %>%
   geom_boxplot() +
   coord_flip() +
   geom_hline(yintercept = 0, linetype="dashed", color = "orange2") +
-  labs(title = "Distribution of second-phase slope for 'segmented.lme'") +
+  # labs(title = "Distribution of second-phase slope for `segmented.lme`") +
   ylab("Second-phase slope value (SDI/time)") +
   xlab("Data-Generating Mechanism")
 ```
@@ -403,9 +418,9 @@ In most DGM, more than 3/4 of the second-phase slope value are positive, consist
 For the DGM which has the low breakpoint dispersion however, the distribution seems to be centered around 0.
 
 
-### _segreg_
+### `segreg`
 
-```{r est_dist.segreg.dgm, warning=FALSE, fig.align='center'}
+```{r est-dist-segreg-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM - method `segreg`"}
 dataset1.segreg <- estimates.segreg %>% 
   group_by(simID) %>%
   summarise(
@@ -422,7 +437,7 @@ ggplot(dataset1.segreg , aes(x = scenarLabel, y = break.avg)) +
   geom_boxplot() +
   geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
   coord_flip() +
-  labs(title=TeX("Empirical \\hat{\\psi} distribution for every data-generating mechanism"),
+  labs(title=TeX("Empirical \\hat{\\psi} distribution for every DGM"),
        subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
   ylab(TeX("Breakpoint estimates \\hat{\\psi} distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
@@ -430,13 +445,13 @@ ggplot(dataset1.segreg , aes(x = scenarLabel, y = break.avg)) +
 
 Overall, the distribution appears to be centered around the true value, albeit some scenario exhibits substantial deviation from the true value $\psi$. No remarkable outliers are to be noted.
 
-## Bivariate plot of $\hat{\psi_i}$ for each DGM
+## Bivariate plot of $\hat{\psi_d}$ for each DGM
 
 With this plot, the goal is to try and look for correlation between the two methods, and any systematic differences for a given DGM.
 
 The estimated breakpoint $\psi$ is represented on both axis, each axis corresponding to one of the two methods.
 
-```{r biv_plot, warning=FALSE, fig.align='center'}
+```{r biv-plot, warning=FALSE, fig.align='center', fig.cap="Bivariate plot of breakpoint estimates $\\hat{\\psi_d}$, for the reference scenario, for both methods"}
 dataset2 <- estimates.segreg %>%
   group_by(simID) %>%
   summarise(est.psi.segreg = mean(break.x1)) %>%
@@ -456,8 +471,8 @@ ggplot(dataset2 %>% filter(str_detect(scenarLabel, "REF")),
                         round(cor(dataset2 %>% filter(str_detect(scenarLabel, "REF")) %>%
                                     select(starts_with("est.")),
                                   use = "na.or.complete"), 2)[1,2])) +
-  xlab(TeX("Estimated \\hat{\\psi} for 'segreg'")) +
-  ylab(TeX("Estimated \\hat{\\psi} for 'segmented.lme'"))
+  xlab(TeX("Estimated \\hat{\\psi} for `segreg`")) +
+  ylab(TeX("Estimated \\hat{\\psi} for `segmented.lme`"))
 
 cor.test(
   dataset2$est.psi.seglme[str_detect(dataset2$scenarLabel, "REF")],
@@ -465,11 +480,11 @@ cor.test(
 )$conf.int
 ```
 
-The data pairs come from the same repetition (ie, they are estimated in the same simulated dataset) and are compared to the line of equality $y=x$. The scatter plot for the reference scenario depicts disagreement between the two methods, correlation being as low as $\hat\rho \hspace{1mm} [CI95\%] = 0.66 \hspace{1mm} [0.60 - 0.70]$.
+The data pairs come from the same repetition (ie, they are estimated in the same simulated dataset) and are compared to the line of equality $y=x$. The scatter plot for the reference scenario depicts differences between the two methods, correlation being as low as $\hat\rho \hspace{1mm} [CI95\%] = 0.66 \hspace{1mm} [0.60 - 0.70]$.
 
-The bivariate plot is produced in a panel for every data-generating mechanism below:
+The bivariate plot is produced in a panel for every data-generating mechanism (DGM) below:
 
-```{r biv_plot.dgm, fig.width=10, warning=FALSE, fig.align='center'}
+```{r biv-plot-dgm, fig.width=10, warning=FALSE, fig.align='center', fig.cap="Bivariate plot of breakpoint estimates $\\hat{\\psi_d}$, for all DGM, for both methods"}
 dataset2.scenar <- dataset2 %>%
   group_by(scenarLabel) %>%
   mutate(rho = cor(est.psi.segreg, est.psi.seglme, use = "na.or.complete"),
@@ -481,8 +496,8 @@ ggplot(dataset2.scenar, aes(x=est.psi.segreg, y=est.psi.seglme)) +
   geom_smooth(method = lm, formula = y~x) +
   geom_abline(slope=1, lty = "dashed", colour="orange2") +
   labs(title=TeX("Bivariate plot of \\hat{\\psi} for every scenario (Dashed line is y=x)")) +
-  xlab(TeX("Estimated \\hat{\\psi} for 'segreg'")) +
-  ylab(TeX("Estimated \\hat{\\psi} for 'segmented.lme'"))
+  xlab(TeX("Estimated \\hat{\\psi} for `segreg`")) +
+  ylab(TeX("Estimated \\hat{\\psi} for `segmented.lme`"))
 ```
 
 This panel exhibits heterogeneous between-method correlation among the different scenarios, the lowest being 0.33 for the scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.77 for the one with the longest plateau duration $T_{peak}=143$ minutes.
@@ -492,16 +507,18 @@ Overall, the correlation in the breakpoint estimate between the two methods is l
 
 ## Zip plot
 
-A zip plot is a plot of confidence intervals (CI) fractionally ranked by $|z_i|$, with $z_i := \frac{(\hat{\psi_i} - \psi)}{\sigma_{\psi}}$. It is a mean of understanding issue with coverage.
+A zip plot is a plot of confidence intervals (CI) fractionally ranked by $|z_i|$, with $z_i := \frac{(\hat{\psi_i} - \psi)}{\sigma_{\psi}}$. 
+The color blue is used when the CI covered the true value (which is 77) while the color red is used when it did not. The yellow dashed lines represents the confidence interval on the coverage probability estimate.
+The zip plot is a mean of understanding potential issues with coverage.
 Under or over coverage typically arises in one of two situations:
 
-1. Bias in the breakpoint estimate $\hat\psi_i$ ; 
-1. Misestimated empirical SE $\hat\sigma_{\hat\psi_i}$ of breakpoint estimate. Exempt of bias, underestimating this quantity leads to undercoverage, and overestimating it leads to overcoverage.
+1. Bias in the breakpoint estimate $\hat\psi_d$ ; 
+1. Misestimated empirical SE $\hat s_{\hat\psi_d}$ of breakpoint estimate. Exempt of bias, underestimating this quantity leads to undercoverage, and overestimating it leads to overcoverage.
 
 
-### _segmented.lme_
+### `segmented.lme`
 
-```{r zip_plot.seglme, fig.width=10, fig.height=6, warning=FALSE, fig.align='center'}
+```{r zip-plot-seglme, fig.width=10, fig.height=6, warning=FALSE, fig.align='center', fig.cap="Zip plot for breakpoint estimates $\\hat{\\psi_d}$ - method `segmented.lme`"}
 seglme.df <- estimates.seglme %>%
   group_by(simID) %>%
   summarise(break.avg = first(break.avg),
@@ -536,7 +553,7 @@ p <- ggplot(dataset %>% filter(method=="segmented.lme" & !is.na(contains)),
   facet_wrap(~scenarLabel) +
   geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
   geom_hline(yintercept = 0.95, linetype = "dashed") +
-  labs(title = "Zip plot for method 'segmented.lme' for every DGM", colour = "") +
+  labs(title = "Zip plot for method `segmented.lme` for every DGM", colour = "") +
   xlab("95% confidence intervals") +
   ylab("Fractional centiles of |z-score|") +
   scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
@@ -565,18 +582,16 @@ p +
              linetype = "dashed", linewidth = 1.2, colour = "yellow")
 ```
 
-Blue CIs are coverers (_ie_ they include the true value $\psi=77$), red CIs are non-coverers (_ie_ they do not include the true value $\psi$). The yellow dashed lines represents the confidence interval on the coverage probability estimate.
-
 The panel shows substantial undercoverage for every DGM but  the first one (lowest $\sigma_\psi=5$). Non-coverers can take up to more than 50% of all CIs for a given DGM.
-Since we already know about the substantial bias on the breakpoint estimate $\hat\psi_i$, it becomes clear that the breakpoint SE was underestimated in most cases.
+Since we already know about the substantial bias on the breakpoint estimate $\hat\psi_d$, it becomes clear that the breakpoint SE was underestimated in most cases.
 
-<!-- Ironically enough, whilst some parameters were expected to have a harmful impact on performances (such as lower number of observations or higher outlier probability), they tend to patch undercoverage due to the substantial underestimation in $\hat\psi_i$. -->
-
-
-### _segreg_
+<!-- Ironically enough, whilst some parameters were expected to have a harmful impact on performances (such as lower number of observations or higher outlier probability), they tend to patch undercoverage due to the substantial underestimation in $\hat\psi_d$. -->
 
 
-```{r zip_plot.segreg, fig.width=10, fig.height=6, warning=FALSE, fig.align='center'}
+### `segreg`
+
+
+```{r zip-plot-segreg, fig.width=10, fig.height=6, warning=FALSE, fig.align='center', fig.cap="Zip plot for breakpoint estimates $\\hat{\\psi_d}$ - method `segreg`"}
 p <- ggplot(dataset %>% filter(method=="segreg" & !is.na(contains)),
        aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up,
            colour = contains)) +
@@ -584,7 +599,7 @@ p <- ggplot(dataset %>% filter(method=="segreg" & !is.na(contains)),
   facet_wrap(~scenarLabel) +
   geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
   geom_hline(yintercept = 0.95, linetype = "dashed") +
-  labs(title = "Zip plot for method 'segreg' for every DGM", colour = "") +
+  labs(title = "Zip plot for method `segreg` for every DGM", colour = "") +
   xlab("95% confidence intervals") +
   ylab("Fractional centiles of |z-score|") +
   scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
@@ -613,8 +628,8 @@ p +
              linetype = "dashed", linewidth = 1.2, colour = "yellow")
 ```
 
-The plateau model _segreg_ also demonstrates substantial undercoverage.
-This is most likely due to an under-estimation of the breakpoint SE $\hat\sigma_{\hat\psi_i}$. Scenario (2) exhibits a strong shift in $\hat\psi_i$ (overestimation) when its variance $\sigma^2_\psi$ is higher.
+The plateau model `segreg` also demonstrates substantial undercoverage.
+This is most likely due to an under-estimation of the breakpoint SE $\hat s_{\hat\psi_d}$. Scenario (2) exhibits a strong shift in $\hat\psi_d$ (overestimation) when its variance $\sigma^2_\psi$ is higher.
 
 
 
@@ -625,7 +640,7 @@ This is most likely due to an under-estimation of the breakpoint SE $\hat\sigma_
 
 # Performance measurements and Monte Carlo Standard Errors
 
-```{r metrics_dataset}
+```{r metrics-dataset}
 ## unique dataset with all results for both methods
 dataset <- seglme.df %>%
   bind_rows(segreg.df, .id = "method") %>%
@@ -662,26 +677,26 @@ The results are presented as point estimate along with their **Monte Carlo Stand
 
 
 
-## Bias lollipop plot
-<!-- NOT ESSENTIAL -->
+<!-- ## Bias lollipop plot -->
+<!-- <!-- NOT ESSENTIAL --> -->
 
-```{r lolli_bias, fig.width=10}
-autoplot(summ, stats = "bias", type = "lolly") +
-  labs(title = TeX("Bias in breakpoint estimate \\hat{\\psi}"),
-       subtitle = "For both methods and every DGM") +
-  xlab(TeX("Relative bias in breakpoint estimate \\hat{\\psi}"))
-```
+<!-- ```{r lolli-bias, fig.width=10} -->
+<!-- autoplot(summ, stats = "bias", type = "lolly") + -->
+<!--   labs(title = TeX("Bias in breakpoint estimate \\hat{\\psi}"), -->
+<!--        subtitle = "For both methods and every DGM") + -->
+<!--   xlab(TeX("Relative bias in breakpoint estimate \\hat{\\psi}")) -->
+<!-- ``` -->
 
-One can only notice the substantial and significant bias that the mixed model suffers from. The plateau model performs much better. Though the latter demonstrates a significant bias in a lot of scenarios, it is often not clinically relevant quantity (12/14 have an absolute bias under 1 minutes). 
-We will see in the Discussion how the breakpoint estimate relates to the clinical indicators, in terms of quantity.
+<!-- One can only notice the substantial and significant bias that the mixed model suffers from. The plateau model performs much better. Though the latter demonstrates a significant bias in a lot of scenarios, it is often not clinically relevant quantity (12/14 have an absolute bias under 1 minutes).  -->
+<!-- We will see in the Discussion how the breakpoint estimate relates to the clinical indicators, in terms of quantity. -->
 
-This observation has to be tempered by the fact that we reported the population-level breakpoint $\hat\psi_i$. The individual breakpoints $\hat\psi_{ij}$ might demonstrates other properties for the same performance measurements.
+<!-- This observation has to be tempered by the fact that we reported the population-level breakpoint $\hat\psi_d$. The individual breakpoints $\hat\psi_{di}$ might demonstrates other properties for the same performance measurements. -->
 
 
 
 ## Performance measurements table
 
-```{r performance_table}
+```{r performance-table}
 # computing the table of performance measurements
 typeIerr <- .05
 formatted.res <- summ$summ  %>%
@@ -771,13 +786,13 @@ formatted.res %>%
 *point estimate (MCSE) - green cells indicates that the target value (e.g. 0 for bias, 0.95 for coverage) is reached for the performance measure*
 </center>
 
-Overall, there is a significant **bias** in the breakpoint estimate $\hat\psi_i$, being notably underestimated by the mixed model, and misestimated in more than half DGM for the plateau model.
+Overall, there is a significant **bias** in the breakpoint estimate $\hat\psi_d$, being notably underestimated by the mixed model, and biased in more than half DGM for the plateau model.
 
 
 **Coverage probability** is not reaching the nominal level of 95% for any of the methods, all DGM combined.
 Both models suffers from a substantial undercoverage. At least two factors are clearly identified here: 
 
-1. A (more or less) substantial bias in the breakpoint estimate $\hat\psi_i$
+1. A (more or less) substantial bias in the breakpoint estimate $\hat\psi_d$
 2. The underestimation of the breakpoint SE (**empirical SE > model SE**)
 
 The last assumption for constructing the CIs is the distribution of the breakpoint estimate. Here it is assumed to follow a normal distribution. From the empirical boxplots, we can assess that the distribution is skewed, so normality could be an inappropriate approximation.
@@ -786,9 +801,9 @@ The last assumption for constructing the CIs is the distribution of the breakpoi
 Below are listed the different **effects of simulation parameters** on the performance measurements:
 
 - $\sigma_\psi$ (DGM 1,2 + ref): The higher the breakpoint individual variance, the more biased estimates are. This is also negatively impacting the coverage probability.
-- $T_{peak}$ (DGM 3,4 + ref): The higher the duration of plateau, the less biased the breakpoint estimate $\hat\psi_i$ is. The longest plateau is the one scenario for which both methods performs well, in terms of bias at least.
-- $\sigma_\varepsilon$ (5, 6 + ref): The residual variance (noise on the point measurements in the datasets) impacts significantly and negatively bias. It does not induce a significant change in the bias-eliminated coverage.
-- $p_{out}$ (DGM 7,8 + ref): The individual probability of having exactly one outlier in the time series makes both breakpoint estimate $\hat\psi_i$ and its SE $\hat\sigma_{\hat\psi_i}$ significantly higher.
+- $T_{peak}$ (DGM 3,4 + ref): The higher the duration of plateau, the less biased the breakpoint estimate $\hat\psi_d$ is. The longest plateau is the one scenario for which both methods performs well, in terms of bias at least.
+- $\sigma_\varepsilon^2$ (5, 6 + ref): The residual variance level (noise on the point measurements in the datasets) impacts significantly and negatively bias. It does not induce a significant change in the bias-eliminated coverage.
+- $p_{out}$ (DGM 7,8 + ref): The individual probability of having exactly one outlier in the time series makes both breakpoint estimate $\hat\psi_d$ and its SE $\hat s_{\hat\psi_d}$ significantly higher.
 - $n_{obs}$ (DGM 9-14): Most surprisingly, when the number of observations (number of subjects per datasets) increases, it may induced a bias in the mixed model, though it may be an artifact of random sampling given the MCSE associated. For the plateau model however, it reduces the bias on the estimation. As expected, the empirical and model SE decreases when $n_{obs}$ increases. $n_{obs}$ increasing also impacts negatively the coverage probability: it looks like this parameter could make the coverage go as arbitrary low as we want (25% when $n_{obs}=100$).
 
 
@@ -807,23 +822,36 @@ Coverage was initially reported as a little under the nominal level of 95% for t
 Bias always differs substantially from the one reported in the original articles. The structure of the data (plateau in second phase) could explain partly why the mixed model underestimates it greatly.
 
 
-The poor performances on the reference scenario makes the comparison a little awkward in the one-at-a-time plan (since models performs poorly "by default", one cannot judge the impact of a simulation parameters by the absolute value of the performance measurements but rather in comparison to the reference itself. A parameter might improve the models' performance whilst they could still be judged unsatisfactory, only better than the reference).
+The poor performances on the reference scenario makes the comparison a little less relevant in the one-at-a-time plan (since models performs poorly "by default", one cannot judge the impact of a simulation parameters by the absolute value of the performance measurements but rather in comparison to the reference itself. A parameter might improve the models' performance whilst they could still be judged unsatisfactory, only better than the reference).
 
 
+REWORK Discussion (incorporate): 
+
+- Though the absence of random effects on the time slopes may look surprising, it appears in practice that the value of their associated variance is not significant. 
+- In particular, the convergence of the model is sensible to the starting values of the breakpoint With real data, in case it does not work in the first try, one could always visually inspect the scatter plot to provide a better initial guess to the model.
+
+
+
+== another story ?
 Another problem with the mixed model concerns the random effect quantification: when we include the random effects on both the breakpoint and the two time slopes, the standard deviation on the random effect of the time slopes is close to zero. However, when we are using a degree of freedom for the individual breakpoints, it only appears natural to also give the same degrees of freedom to the time slopes, who are meeting at the breakpoint. This may call for a future simulation study focusing on this specific weakness of the mixed model, to try and investigate the most appropriate random effect structure for this data. Hypothetically, since both the breakpoint and the slopes are estimated simultaneously, it could be that the linear reparametrization "favors" the breakpoint to capture all the individual deviation, at the expense of the time slopes deviations.
 
 
 The plateau not being specified in the mixed model is a big penalty to its performances. To try and assess its potential on data with plateau phase(s), we will then extend the model to make it take this features into account, and then evaluate it again in a future simulation study.
 
 
+
+
+
+
+
 ## Quantitative link with the time slopes and MEQ30
 
-The quantitative summary of the varying phases in SDI after psilocybin intake are the time slopes. They are not only defined by the breakpoint time coordinate $\psi$, but also its coordinate on the SDI scale: $\beta = SDI(\psi)/\psi$ since their is no intercept is the model.
+The quantitative summary of the varying phases in SDI after psilocybin intake are the time slopes. They are not only defined by the breakpoint time coordinate $\psi$, but also its coordinate on the SDI scale: $\beta = SDI(\psi)/\psi$ since their is no intercept in the model.
 
 One of the question of the original article [@stenbaek_brain_2021] is: is there a correlation between the quantitative summary of the breakpoint trajectories and the MEQ30 sum score ? To try and evaluate how well the model did on a more clinical perspective, we simulated MEQ30 sum score value, with different known correlation values with the true time slopes (derived from the true breakpoint location). We then estimated the correlation between the estimated time slopes and the MEQ30 score, to compare the correlations values:
 
 
-```{r meq30_corr}
+```{r meq30-corr, fig.cap="Mean estimated slope-MEQ correlation (SE) for every DGM"}
 # simulate the meq30 values in correlation with the slope coefficients
 set.seed(05062026)
 mean.meq <- 3.6
