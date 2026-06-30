@@ -33,17 +33,14 @@ SDI101.fit <- function(psi0 = rep(NA_real_, 2), data = NA, tol.psi = 1e-3,
     V1 <- 1*(x > psi.history[it, 1])
     V2 <- - (x > psi.history[it, 2])
     
-    # 2. Fit the model with the additional covariates
+    # 2. Fit the model with the additional covariates U, V:
     mod.lin <- lm(y ~ 0 + U1 + U2 + V1 + V2, x = T)
     mod.coef <- as.list(mod.lin$coefficients)
     
-    # 3. Improve breakpoints estimates
-    # browser()
-    # psi.old <- psi.new
+    # 3. Improve breakpoints estimates:
     psi.history[it+1, 1] <- psi.history[it, 1] + mod.coef$V1/mod.coef$U1
     psi.history[it+1, 2] <- psi.history[it, 2] + mod.coef$V2/mod.coef$U2
     psi.diff <- max(abs(psi.history[it+1,] - psi.history[it,])) # L-Inf norm
-    # psi.history[it+1,] <- psi.new
   }
   
   # WARNING if non convergence (it.max reached)
@@ -80,32 +77,55 @@ library(lmbreak)
 library(ggplot2)
 library(dplyr)
 data(SDIpsilo, package = "lmbreak")
+
+
+# algorithm is sensible to starting points, let's give the real values for initialization first
+library(lmbreak)
+e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
+                    trace = FALSE)
+plot(e.XPall)
+breakpoints <- model.tables(e.XPall)[rep((1:15-1)*4,each=3)+2:4, 2]
+breakpoints <- matrix(breakpoints, ncol = 3, byrow = T) # breakpoints
+breakpoints
+
+
+# start with right initialization
 fit101.res <- list()
 for(ID in levels(SDIpsilo$id)){
   SDI.ind <- SDIpsilo %>% filter(id==ID)
   ggplot(SDI.ind, aes(x=time, y=score)) + 
     geom_point()
   tryCatch({
-    break101.fit <- SDI101.fit(data = SDI.ind)
+    break101.fit <- SDI101.fit(data = SDI.ind, 
+                               psi0 = breakpoints[as.numeric(ID), 1:2],
+                               model = FALSE)
     fit101.res[[as.numeric(ID)]] <- break101.fit
-    names(fit101.res)[length(fit101.res)] <- as.numeric(ID)
   }, error = function(e){
     # browser()
-    print(paste(ID, "- ERORR:"))
+    fit101.res[[as.numeric(ID)]] <<- NA
+
+    print(paste("ID ", ID, "- ERROR:"))
     print(e$message)
-  })
-  # , warning = function(w){
-  #   print(paste(ID, "- WARNING:"))
+  }
+  # warning = function(w){
+  #   fit101.res[[as.numeric(ID)]] <<- NA
+  #   
+  #   print(paste("ID ", ID, "- WARNING:"))
   #   # browser()
   #   print(w$message)
-  # })
-
+  # }, 
+  # finally = {
+  #   names(fit101.res)[length(fit101.res)] <- as.numeric(ID)
+  # }
+  )
 }
 
-# does not CV for 2 (explosion), 4, 15 (oscillation??), uniform initializing might be a bit shitty...
-ggplot(SDIpsilo %>% filter(id %in% c(2, 4, 15)), aes(x=time, y=score)) +
-  geom_point() +
-  facet_wrap(~id)
+# warnings for individuals 11 and 15 (again)
+head(fit101.res[[11]]$psi.history)
+head(fit101.res[[15]]$psi.history)
+# both due to 2-periodic oscillations after init, in range of time domain and in order
+# CV OK // Continuity NOT OK in Brice's package
+
 
 # to make it better:
 # - bootstrap restart ? study what and how - bootstrap on the initial breakpoint?

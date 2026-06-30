@@ -35,12 +35,13 @@ head(SDIpsilo.ext)
 
 ## NRU Psilo
 data(SDIpsilo, package = "lmbreak")
+SDIpsilo <- SDIpsilo[SDIpsilo$type %in% c("noise","trailing") == FALSE,] # article's analysis
 max.time = max(SDIpsilo$time, na.rm=T)
 cols <- c("signal" = "blue", "noise" = "red", "trailing" = "black", "added" = "black")
 pchs <- c("signal" = 19, "noise" = 17, "trailing" = 1, "added" = 8)
-cluster <- c(1, 9, 13) # levels(SDIpsilo$id)
+cluster <- levels(SDIpsilo$id) # c(1, 9, 13)
 ggplot(data = SDIpsilo %>% filter(!is.na(score) & id %in% cluster),
-       mapping = aes(x=time, y=score, colour = type, shape = type)) +
+       mapping = aes(x=time, y=score, colour = type, shape = type)) + # 
   geom_point() +
   facet_wrap(~id) +
   
@@ -53,7 +54,8 @@ ggplot(data = SDIpsilo %>% filter(!is.na(score) & id %in% cluster),
   scale_shape_manual(values = pchs) + # same but for shape
   
   # labels
-  labs(title = "Subjective Drug Intensity over time for all patients",
-       x = "Time since drug intake (minutes)", y = "SDI")
+  labs(title = "Subjective Drug Intensity over time for all patients") +
+  xlab("Time since drug intake (minutes)") + 
+  ylab("SDI")
 
-# ggsave("../../figures/basel/gg-basel-all.png", width = 21*2, height = 14.8*2, units = "cm")
+# ggsave("inst/figs/SDI-13-nofit.png", width = 148, height = 105, units = "mm")

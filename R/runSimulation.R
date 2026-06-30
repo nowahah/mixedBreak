@@ -5,12 +5,13 @@ library(dplyr)
 source("R/trueTraj.R")
 source("R/noiseTraj.R")
 source("R/normalize.R")
+source("R/print.R")
 
 
 ## Simulation parameters ====
 
 # FIXED PARAMETERS
-n.sim <- 594L # 594L nb of repetition for each scenario
+n.sim <- 4L # 594L nb of repetition for each scenario
 print(paste("n.sim =", n.sim, "repetitions per DGM"))
 times <- list("value" = 20, "sd" = 2) # time of measurement in simulated experiments
 na.prob <- 1 / 20 # measurement probability to be missing
@@ -160,7 +161,7 @@ for (ii in 1:nrow(scenario.data)){
     # if (sim.nb!=11) next
 
     ## 0. update 'progress bar' information
-    if (sim.nb %% 100 == 0 | sim.nb %in% c(2, nsimAll)){ print(paste(sim.nb, "/", nsimAll)) }
+    if (sim.nb %% 10 == 0 | sim.nb %in% c(2, nsimAll)){ print(paste(sim.nb, "/", nsimAll)) }
 
     ## 1. set seed
     set.seed(allseeds[sim.nb])
@@ -189,10 +190,16 @@ for (ii in 1:nrow(scenario.data)){
     tryCatch(
       {
         # browser()
+        # sim.dataset <- sim.data[["sim.dataset"]]
+        # psi0 <- (sim.dataset %>% group_by(ID) %>% 
+        #   summarise(time.max = max(time)) %>% 
+        #   summarise(psi0 = mean(time.max)/2))$psi0[1] # initial guess for the breakpoint
+        # sim.dataset <- sim.dataset %>%
+        #   mutate(U1 = pmax(0, time - psi0)) # mystery error
         mod.lme <- lme(
-          score ~ 0+time,
-          random = ~time|ID,
-          data = sim.data$sim.dataset,
+          score ~ 0 + time, # + U1
+          random = ~time|ID, # + U1
+          data = sim.dataset,
           na.action = na.omit,
           control = lmeControl(msMaxIter = 1000, msMaxEval = 1000)
         )
@@ -208,9 +215,9 @@ for (ii in 1:nrow(scenario.data)){
     if(all(is.na(estimates.seglme[estimates.seglme$simID == sim.nb, 'error']))){
       tryCatch(
         {
-          browser()
+          # browser()
           mod.seg.lme <- segmented.lme(
-            mod.lme, ~time,
+            mod.lme, ~ time,
             random = list(ID = pdDiag(~1+G0))
             # , control = seg.control(n.boot=25L)
           )
@@ -265,7 +272,7 @@ for (ii in 1:nrow(scenario.data)){
     # 4.2. segreg results
     if(all(is.na(estimates.segreg[estimates.segreg$simID==sim.nb, 'error']))){
       
-      browser()
+      # browser()
       res.segreg <- normalize(mod.segreg)
 
       # only individual level values
@@ -299,9 +306,9 @@ print(end.time-start.time)
 
 ## WRITING RESULTS IN FILE
 library(writexl)
-write_xlsx(estimates.seglme, "data/esimates_seglme.xlsx")
-write_xlsx(estimates.segreg, "data/esimates_segreg.xlsx")
-write_xlsx(list(true.parameters=true.parameters, scenario.data = scenario.data), 
+write_xlsx(estimates.seglme, "data/estimates_seglme.xlsx")
+write_xlsx(estimates.segreg, "data/estimates_segreg.xlsx")
+write_xlsx(list(true.parameters=true.parameters, scenario.data = scenario.data),
            "data/true_parameters.xlsx")
-write_xlsx(list(all.seeds=data.frame(allseeds), ending.seed=data.frame(ending.seed)), 
+write_xlsx(list(all.seeds=data.frame(allseeds), ending.seed=data.frame(ending.seed)),
                 "data/random_seed.xlsx")

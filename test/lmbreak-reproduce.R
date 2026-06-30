@@ -8,6 +8,12 @@ library(ggplot2)
 data(SDIpsilo, package = "lmbreak")
 SDIpsilo <- SDIpsilo[SDIpsilo$type %in% c("noise","trailing") == FALSE,]
 str(SDIpsilo)
+# REPORT GRAPHS
+# SDIpsilo$SDI <- SDIpsilo$score # just renaming 
+# e.ind13 <- lmbreak(SDI ~ 0 + bp(time, "101"), data = SDIpsilo[SDIpsilo$id==13,], 
+#                    trace = FALSE)
+# plot(e.ind13, title="")
+# ggsave("inst/figs/SDI-13-fit.png", width = 148, height = 105, units = "mm")
 
 
 ## Multiple clusters (patients)
@@ -15,8 +21,7 @@ e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo
                     trace = FALSE)
 summary(e.XPall)
 tbl <- model.tables(e.XPall)
-plot(e.XPall, cluster=c(13))
-# ggsave("../../figures/SDI/gg-ind13-without_outlier.png", width = 21, height = 14.8, units = "cm")
+plot(e.XPall)
 
 breakpoints <- tbl[rep((1:15-1)*4,each=2)+2:4, 2]
 breakpoints <- matrix(breakpoints, ncol = 3, byrow = T) # breakpoints

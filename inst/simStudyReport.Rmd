@@ -16,7 +16,7 @@ bibliography: "biblio.bib"
 
 ```{r setup, include=FALSE, fig.align='center'}
 knitr::opts_chunk$set(echo = FALSE)
-# knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak")
+knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak/inst")
 ```
 
 
@@ -35,8 +35,8 @@ library(glue)
 
 
 ```{r load_results, include=FALSE}
-estimates.seglme <- read_excel("../data/esimates_seglme.xlsx")
-estimates.segreg <- read_excel("../data/esimates_segreg.xlsx", guess_max = 10000L)
+estimates.seglme <- read_excel("../data/estimates_seglme.xlsx")
+estimates.segreg <- read_excel("../data/estimates_segreg.xlsx", guess_max = 10000L)
 true.parameters <- read_excel("../data/true_parameters.xlsx", sheet = "true.parameters")
 scenario.data <- read_excel("../data/true_parameters.xlsx", sheet = "scenario.data")
 # all.seeds <- read_excel("../data/random_seed.xlsx", sheet = "all.seeds")$allseeds
@@ -61,6 +61,36 @@ scenario.data$scenarLabel <- factor(scenario.data$scenarLabel,
                                     levels(scenario.data$scenarLabel)[reorder.index])
 levels(scenario.data$scenarLabel) <- paste0("(", 1:nrow(scenario.data), ") ", 
                                             levels(factor(scenario.data$scenarLabel)))
+
+latex_labels <- c(
+  TeX("(1) $\\sigma_{\\psi}$ = 5"),
+  TeX("(2) $\\sigma_{\\psi}$ = 33"),
+  TeX("(3) $T_{\"peak\"}$ = 32"),
+  TeX("(4) $T_{\"peak\"}$ = 143"),
+  TeX("(5) $\\sigma_{\\epsilon}$ = 0.5"),
+  TeX("(6) $\\sigma_{\\epsilon}$ = 2"),
+  TeX("(7) $p_{\"out\"}$ = 0"),
+  TeX("(8) $p_{\"out\"}$ = 1"),
+  TeX("(9) $n_{\"obs\"}$ = 10"),
+  TeX("(10) $n_{\"obs\"}$ = 15"),
+  TeX("(11) $n_{\"obs\"}$ = 20"),
+  TeX("(12) $n_{\"obs\"}$ = 25 (REF)"),
+  TeX("(13) $n_{\"obs\"}$ = 50"),
+  TeX("(14) $n_{\"obs\"}$ = 100")
+)
+
+# scenar Label for exporting reults in Typst csv
+scenarTypst <- data.frame(
+  scenarLabel = levels(scenario.data$scenarLabel)
+)
+scenarTypst <- scenarTypst %>%
+  mutate(scenarTypst = str_replace_all(
+    scenarLabel, 
+    c("break.sd" = "$sigma_psi$",
+      "peak.duration.mean" = '$T_("peak")$',
+      "score.sd.slopes" = "$sigma_epsilon$",
+      "outlier.prob" = '$p_("out")$',
+      "n.obs" = '$n_("obs")$')))
 ```
 
 
@@ -270,7 +300,7 @@ levels(error.segreg2) <- c(
   "psi values too close each other. Please change (decreases number of) starting values",
   "starting psi out of the range"
 )
-knitr::kable(table(error.segreg2), align = 'll') 
+knitr::kable(table(error.segreg2), align = 'll')
 ```
 
 Two errors could have probably been prevented with a more elaborated code. They were not encountered during the test runs:
@@ -352,9 +382,11 @@ ggplot(dataset1 %>% filter(str_detect(scenarLabel, "REF")), aes(x = break.avg, y
                                        na.rm=T),1), "; Median(\\hat{\\psi}) =",
                             round(median(dataset1$break.avg[str_detect(scenarLabel,"REF")],
                                                    na.rm=T),1)))) +
+  xlab("Estimated breakpoint distribution (min)") +
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
+# ggsave("figs/dist-mixed-ref.png", width = 148, height = 105, units = "mm")
 ```
 
 The distribution of estimated breakpoint is notably shifted to the right, with the true mean being over the mode and median by 3.4 minutes, which could be a significant bias in the method. 
@@ -362,22 +394,27 @@ The distribution of estimated breakpoint is notably shifted to the right, with t
 
 Most importantly, the scenario-wise distribution is the following:
 
-```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates \\hat{\\psi_d} for all DGM (`segmented.lme`) - orange line is target $\\psi=77$"}
+```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM (`segmented.lme`) - orange line is target $\\psi=77$"}
 dataset1.lme <- estimates.seglme %>% 
   select(simID, break.avg) %>% 
   distinct() %>% 
   left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
-  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+  left_join(scenario.data %>% select(starts_with("scenar")), by="scenarID") %>%
   distinct()
 
 # boxplot
+# mqke the figure with only one scenario
+# %>% mutate(break.avg = if_else(scenarLabel!="(12) n.obs = 25 (REF)", NA, break.avg))
 ggplot(dataset1.lme , aes(x = scenarLabel, y = break.avg)) +
+  # ylim(25, 100) +
   geom_boxplot() +
   geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
   coord_flip() +
+  scale_x_discrete(labels = latex_labels) +
   # labs(subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
-  ylab(TeX("Breakpoint estimates \\hat{\\psi_d} distribution")) +
+  ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
+# ggsave("figs/dist-mixed-all.png", width = 148, height = 105, units = "mm")
 ```
 
 The labels on the _y_-axis corresponds to the parameter varying with all of the others being of the reference "cased-base" (scenario 7).
@@ -392,15 +429,16 @@ This observation is consistent with our hypothesis: because the plateau is not e
 
 ```{r slope2, warning=FALSE, fig.align='center', fig.cap="Distribution of second-segment slope ($\\beta_1+\\beta_2$) for all DGM (`segmented.lme`)"}
 ggplot(estimates.seglme %>% 
-         left_join(true.parameters[, c("simID", "scenarID")] %>% distinct(), by="simID") %>% 
+         left_join(true.parameters[, c("simID", "scenarID")] %>% distinct(), by="simID") %>%
          left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID"), 
   aes(x=scenarLabel, y=slope2)) +
   geom_boxplot() +
   coord_flip() +
+  scale_x_discrete(labels = latex_labels) +
   geom_hline(yintercept = 0, linetype="dashed", color = "orange2") +
-  # labs(title = "Distribution of second-phase slope for `segmented.lme`") +
   ylab("Second-phase slope value (SDI/time)") +
   xlab("Data-Generating Mechanism")
+# ggsave("figs/dist-mixed-slope2.png", width = 148, height = 105, units = "mm")
 ```
 
 In most DGM, more than 3/4 of the second-phase slope value are positive, consistently with the formulated hypothesis.
@@ -426,10 +464,12 @@ ggplot(dataset1.segreg , aes(x = scenarLabel, y = break.avg)) +
   geom_boxplot() +
   geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
   coord_flip() +
-  # labs(title=TeX("Empirical \\hat{\\psi_d} distribution for every DGM"),
+  # labs(title=TeX("Empirical $\\hat{\\psi_d}$ distribution for every DGM"),
   #     subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
-  ylab(TeX("Breakpoint estimates \\hat{\\psi_d} distribution")) +
+  scale_x_discrete(labels = latex_labels) +
+  ylab(TeX("Breakpoint estimates $\\hat{\\psi_d}$ distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
+# ggsave("figs/dist-plateau-all.png", width = 148, height = 105, units = "mm")
 ```
 
 Overall, the distribution appears to be centered around the true value, albeit some scenario exhibits substantial deviation from the true value $\psi$. No remarkable outliers are to be noted.
@@ -455,13 +495,13 @@ ggplot(dataset2 %>% filter(str_detect(scenarLabel, "REF")),
        aes(x=est.psi.segreg, y=est.psi.seglme)) +
   geom_point(alpha=.5) +
   geom_abline(slope=1, lty = "dashed", colour="orange2") +
-  labs(title=TeX("Bivariate plot of \\hat{\\psi_d} for the reference scenario"),
+  labs(title=TeX("Bivariate plot of $\\hat{\\psi_d}$ for the reference scenario"),
        subtitle = paste("Dashed line is y = x ; Correlation is",
                         round(cor(dataset2 %>% filter(str_detect(scenarLabel, "REF")) %>%
                                     select(starts_with("est.")),
                                   use = "na.or.complete"), 2)[1,2])) +
-  xlab(TeX("Estimated \\hat{\\psi_d} for `segreg`")) +
-  ylab(TeX("Estimated \\hat{\\psi_d} for `segmented.lme`"))
+  xlab(TeX("Estimated $\\hat{\\psi_d}$ for `segreg`")) +
+  ylab(TeX("Estimated $\\hat{\\psi_d}$ for `segmented.lme`"))
 
 cor.test(
   dataset2$est.psi.seglme[str_detect(dataset2$scenarLabel, "REF")],
@@ -477,16 +517,45 @@ The bivariate plot is produced in a panel for every data-generating mechanism (D
 dataset2.scenar <- dataset2 %>%
   group_by(scenarLabel) %>%
   mutate(rho = cor(est.psi.segreg, est.psi.seglme, use = "na.or.complete"),
-         scenarLabel = as.factor(paste(scenarLabel, "; corr =", round(rho, 2))))
+         # scenarLabel = paste(scenarLabel, "; $\\hat{\\rho}$ =", round(rho, 2)),
+         # scenarLabel = str_replace_all(scenarLabel, 
+         #                               c("break.sd" = "$sigma_psi$",
+         #                                 "peak.duration.mean" = '$T_{\"peak\"}$',
+         #                                 "score.sd.slopes" = "$\\sigma_{\\epsilon}$",
+         #                                 "outlier.prob" = '$p_{\"out\"}$',
+         #                                 "n.obs" = '$n_{\"obs\"}$'))
+         )
 
-ggplot(dataset2.scenar, aes(x=est.psi.segreg, y=est.psi.seglme)) +
-  geom_point(alpha=.5) + 
-  facet_wrap(~scenarLabel) +
+facet_mapping <- list(
+  "(1) break.sd = 5" = TeX("(1) $\\sigma_{\\psi} = 5$"),
+  "(2) break.sd = 33" = TeX("(2) $\\sigma_{\\psi} = 33$"),
+  "(3) peak.duration.mean = 32" = TeX("(3) $T_{\\text{peak}} = 32$"),
+  "(4) peak.duration.mean = 143" = TeX("(4) $T_{\\text{peak}} = 143$"),
+  "(5) score.sd.slopes = 0.5" = TeX("(5) $\\sigma_{\\epsilon} = 0.5$"),
+  "(6) score.sd.slopes = 2" = TeX("(6) $\\sigma_{\\epsilon} = 2$"),
+  "(7) outlier.prob = 0" = TeX("(7) $p_{\\text{out}} = 0$"),
+  "(8) outlier.prob = 1" = TeX("(8) $p_{\\text{out}} = 1$"),
+  "(9) n.obs = 10" = TeX("(9) $n_{\\text{obs}} = 10$"),
+  "(10) n.obs = 15" = TeX("(10) $n_{\\text{obs}} = 15$"),
+  "(11) n.obs = 20" = TeX("(11) $n_{\\text{obs}} = 20$"),
+  "(12) n.obs = 25 (REF)" = TeX("(12) $n_{\\text{obs}} = 25$ (REF)"),
+  "(13) n.obs = 50" = TeX("(13) $n_{\\text{obs}} = 50$"),
+  "(14) n.obs = 100" = TeX("(14) $n_{\\text{obs}} = 100$")
+)
+
+# facet_mapping <- levels(as.factor(dataset2.scenar$scenarLabel))
+# names(facet_mapping) <- sort(levels(scenario.data$scenarLabel))
+
+
+ggplot(dataset2.scenar, aes(x = est.psi.segreg, y = est.psi.seglme)) +
+  geom_point(alpha = 0.5) + 
+  facet_wrap(~ scenarLabel, 
+             labeller = as_labeller(facet_mapping)) +
   geom_smooth(method = lm, formula = y~x) +
   geom_abline(slope=1, lty = "dashed", colour="orange2") +
-  labs(title=TeX("Bivariate plot of \\hat{\\psi_d} for every scenario (Dashed line is y=x)")) +
-  xlab(TeX("Estimated \\hat{\\psi_d} for `segreg`")) +
-  ylab(TeX("Estimated \\hat{\\psi_d} for `segmented.lme`"))
+  # labs(title=TeX("Bivariate plot of $\\hat{\\psi_d}$ for every scenario (Dashed line is y=x)")) +
+  xlab(TeX("Estimated $\\hat{\\psi_d}$ for \\code{segreg}")) +
+  ylab(TeX("Estimated $\\hat{\\psi_d}$ for \\code{segmented.lme}"))
 ```
 
 This panel exhibits heterogeneous between-method correlation among the different scenarios, the lowest being 0.33 for the scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.77 for the one with the longest plateau duration $T_{peak}=143$ minutes.
@@ -515,10 +584,12 @@ seglme.df <- estimates.seglme %>%
             break.x1.random = first(break.x1.random),
             break.CI95.low = first(break.CI95.low),
             break.CI95.up = first(break.CI95.up)) # redundancy in segmented.lme results
+# select() then distinct() ??
 segreg.df <- estimates.segreg %>%
   group_by(simID) %>%
   summarise(break.avg = mean(break.x1),
-            break.x1.sd = mean(break.x1.sd) / sqrt(n()),
+            break.x1.sd = sqrt(mean(break.x1.sd**2)) / sqrt(n()),
+            # break.x1.sd = sqrt(sum(break.x1.sd^2))/n(),
             break.CI95.low = break.avg + qnorm(0.05/2)*break.x1.sd,
             break.CI95.up = break.avg - qnorm(0.05/2)*break.x1.sd)
 
@@ -569,6 +640,7 @@ p +
              linetype = "dashed", linewidth = 1.2, colour = "yellow") +
   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up),
              linetype = "dashed", linewidth = 1.2, colour = "yellow")
+
 ```
 
 The panel shows substantial undercoverage for every DGM but  the first one (lowest $\sigma_\psi=5$). Non-coverers can take up to more than 50% of all CIs for a given DGM.
@@ -615,6 +687,7 @@ p +
              linetype = "dashed", linewidth = 1.2, colour = "yellow") +
   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up),
              linetype = "dashed", linewidth = 1.2, colour = "yellow")
+# ggsave("figs/zip-plateau-ref.png", width = 148, height = 105, units = "mm")
 ```
 
 The plateau model `segreg` also demonstrates substantial undercoverage.
@@ -671,9 +744,9 @@ The results are presented as point estimate along with their **Monte Carlo Stand
 
 <!-- ```{r lolli-bias, fig.width=10} -->
 <!-- autoplot(summ, stats = "bias", type = "lolly") + -->
-<!--   labs(title = TeX("Bias in breakpoint estimate \\hat{\\psi_d}"), -->
+<!--   labs(title = TeX("Bias in breakpoint estimate $\\hat{\\psi_d}$"), -->
 <!--        subtitle = "For both methods and every DGM") + -->
-<!--   xlab(TeX("Relative bias in breakpoint estimate \\hat{\\psi_d}")) -->
+<!--   xlab(TeX("Relative bias in breakpoint estimate $\\hat{\\psi_d}$")) -->
 <!-- ``` -->
 
 <!-- One can only notice the substantial and significant bias that the mixed model suffers from. The plateau model performs much better. Though the latter demonstrates a significant bias in a lot of scenarios, it is often not clinically relevant quantity (12/14 have an absolute bias under 1 minutes).  -->
@@ -714,7 +787,7 @@ formatted.res %>%
   select(stat, scenarLabel, segmented.lme, segreg) %>%
   rename(seglme = segmented.lme) %>%
   pivot_wider(names_from = stat, values_from = c("seglme", "segreg")) %>%
-  relocate(seglme_bias, seglme_empse, seglme_modelse, seglme_cover) %>% # to order the table
+  relocate(seglme_bias, seglme_empse, seglme_modelse, seglme_cover) %>% # order table
   gt(
     rowname_col = "scenarLabel",
     row_group_as_column = TRUE
@@ -757,19 +830,6 @@ formatted.res %>%
       columns = "seglme_cover",
       rows = formatted.res$cover_seglme.target[formatted.res$stat=="cover"] )
   )
-  # # 2. becover!=0.95
-  # tab_style(
-  #   style = cell_fill(color = "#90eea8"),
-  #   locations = cells_body(
-  #     columns = "segreg_becover",
-  #     rows = formatted.res$cover_segreg.target[formatted.res$stat=="becover"] )
-  # ) %>%
-  # tab_style(
-  #   style = cell_fill(color = "#90eea8"),
-  #   locations = cells_body(
-  #     columns = "seglme_becover",
-  #     rows = formatted.res$cover_seglme.target[formatted.res$stat=="becover"] )
-  # )
 ```
 
 <center>
@@ -837,12 +897,14 @@ One of the question of the original article [@stenbaek_brain_2021] is: is there 
 
 ```{r meq30-corr, fig.cap="Mean estimated slope-MEQ correlation (SE) for every DGM"}
 # simulate the meq30 values in correlation with the slope coefficients
+true.parameters <- read_excel("../data/true_parameters.xlsx", 
+                              sheet = "true.parameters")
 set.seed(05062026)
 mean.meq <- 3.6
 min.meq <- 1.9
 max.meq <- 4.9
 sd.meq <- 0.8
-rho.meq <- c(0, 0.25, 0.5)
+target.rho <- c(0, 0.20, 0.5)
 true.parameters <- true.parameters %>% mutate(slope = break.y1/break.x1)
 
 multi.rho <- function(df, rho){
@@ -862,91 +924,141 @@ multi.rho <- function(df, rho){
   return(res)
 }
 
-for(corr.meq in rho.meq){
-  true.parameters <- multi.rho(true.parameters, corr.meq)
+for(rho.meq in target.rho){
+  true.parameters <- multi.rho(true.parameters, rho.meq)
 }
+
+# estimates.segreg %>%
+#   mutate(slope.est = break.y1/break.x1) %>%
+#   select(ends_with("ID"), slope.est) %>% 
+#   inner_join(
+#     true.parameters %>%
+#       select(ends_with("ID"), slope, starts_with("meq")),
+#     by = join_by("simID", "patientID")
+#   ) %>%
+#   group_by(simID) %>%
+#   summarise(
+#     scenarID = first(scenarID),
+#     rho.true.0 = cor(slope, meq30.0),
+#     rho.est.0 = cor(slope.est, meq30.0, use = "na.or.complete"),
+#     rho.true.0.2 = cor(slope, meq30.0.2),
+#     rho.est.0.2 = cor(slope.est, meq30.0.2, use = "na.or.complete"),
+#     rho.true.0.5 = cor(slope, meq30.0.5),
+#     rho.est.0.5 = cor(slope.est, meq30.0.5, use = "na.or.complete"),
+#   ) %>% 
+#   group_by(scenarID) %>%
+#   summarise(
+#     scenarID = first(scenarID),
+#     rho.true.mean.0 = mean(rho.true.0),
+#     rho.est.mean.0 = mean(rho.est.0, na.rm = TRUE),
+#     rho.est.sd.0 = sd(rho.est.0, na.rm = TRUE),
+#     rho.true.mean.0.2 = mean(rho.true.0.2),
+#     rho.est.mean.0.2 = mean(rho.est.0.2, na.rm = TRUE),
+#     rho.est.sd.0.2 = sd(rho.est.0.2, na.rm = TRUE),
+#     rho.true.mean.0.5 = mean(rho.true.0.5),
+#     rho.est.mean.0.5 = mean(rho.est.0.5, na.rm = TRUE),
+#     rho.est.sd.0.5 = sd(rho.est.0.5, na.rm = TRUE)
+#   ) %>%
+#   mutate(
+#     display.0 = paste0(round(rho.est.mean.0, 2), " (", 
+#                                round(rho.est.sd.0, 2), ")"),
+#     display.0.2 = paste0(round(rho.est.mean.0.2, 2), " (", 
+#                                round(rho.est.sd.0.2, 2), ")"),
+#     display.0.5 = paste0(round(rho.est.mean.0.5, 2), " (", 
+#                                round(rho.est.sd.0.5, 2), ")")
+#   ) %>%
+#   select(scenarID, starts_with("display"), starts_with("rho.true")) 
+  
 
   
 # compute the estimated correlation between meq30 and estimated slope coefficients
-# TODO adapt to the correlation wanted `rho`:
-# RENAME the columns in the end
 # SELECT only the columns associated with the right correlation `rho`
+# RENAME the columns in the end
 compute.rho.est <- function(df.est, df.true, rho){
+  browser()
   res <- df.est %>%
     mutate(slope.est = break.y1/break.x1) %>%
     select(ends_with("ID"), slope.est) %>%
-    inner_join(df.true %>% select(ends_with("ID"), slope, starts_with(c("meq", "true"))),
-               by = join_by(simID, patientID)) %>%
+    inner_join(
+      df.true %>% 
+        select(ends_with("ID"), slope, ends_with(as.character(rho))),
+      by = join_by(simID, patientID)
+    ) %>%
+    rename("meq30" = paste0("meq30.", rho),
+           "true.cor" = paste0("true.cor.", rho)) %>%
+    # correlation is computed at the study level
     group_by(simID) %>%
     mutate(rho.est = cor(meq30, slope.est, use="na.or.complete")) %>%
-           # rho.pvalue = if_else(is.na(slope.est), NA,
-           #                      cor.test(meq30, slope.est, use="na.or.complete")$p.value),
-           # rho.signif = rho.pvalue < typeIerr) %>%
-    select(scenarID, simID, rho.est, rho.true) %>%
+    select(scenarID, simID, rho.est, true.cor) %>%
     distinct() %>%
+    ungroup() %>%
     group_by(scenarID) %>%
-    mutate(rho.diff = rho.est - rho.true,
-           rho.est.sd = sd(rho.est, na.rm = TRUE))
+    summarise(rho.mean = mean(rho.est, na.rm = TRUE),
+              rho.est.sd = sd(rho.est, na.rm = TRUE),
+              display = paste0(round(rho.mean, 2), " (", 
+                               round(rho.est.sd, 2), ")")) %>%
+    rename(
+      "display.{rho}" := display,
+      "rho.mean.{rho}" := rho.mean,
+      "rho.est.sd.{rho}" := rho.est.sd
+    )
+  
+  return(res)
+}
+# compute.rho.est(estimates.seglme, true.parameters, rho.meq)
+# compute.rho.est(estimates.segreg, true.parameters, rho.meq)
+
+rho.seglme <- true.parameters %>% select(scenarID) %>% distinct()
+rho.segreg <- rho.seglme
+for(rho.meq in target.rho){
+  rho.seglme <- rho.seglme %>% 
+    left_join(compute.rho.est(estimates.seglme, true.parameters, rho.meq),
+               by=join_by("scenarID"))
+  rho.segreg <- rho.segreg %>% 
+    left_join(compute.rho.est(estimates.segreg, true.parameters, rho.meq),
+               by=join_by("scenarID"))
 }
 
-
-rho.seglme <- estimates.seglme %>%
-  mutate(slope.est = break.y1/break.x1) %>%
-  select(ends_with("ID"), slope.est) %>%
-  inner_join(true.parameters %>% select(ends_with("ID"), slope, starts_with(c("meq", "true"))),
-             by = join_by(simID, patientID)) %>%
-  group_by(simID) %>%
-  mutate(rho.est.0 = cor(meq30.0, slope.est, use="na.or.complete")) %>%
-         # rho.pvalue = if_else(is.na(slope.est), NA,
-         #                      cor.test(meq30, slope.est, use="na.or.complete")$p.value),
-         # rho.signif = rho.pvalue < typeIerr) %>%
-  select(scenarID, simID, rho.est.0, true.cor.0) %>%
-  distinct() %>%
-  group_by(scenarID) %>%
-  mutate(rho.diff.0 = rho.est.0 - true.cor.0,
-         rho.est.sd.0 = sd(rho.est.0, na.rm = TRUE))
-
-rho.segreg <- estimates.segreg %>%
-  mutate(slope.est = break.y1/break.x1) %>%
-  select(ends_with("ID"), slope.est) %>%
-  inner_join(true.parameters %>% select(ends_with("ID"), slope, meq30.0, true.cor.0),
-             by = join_by(simID, patientID)) %>%
-  group_by(simID) %>%
-  # correlation is computed at the study/dataset level
-  mutate(rho.est.0 = cor(meq30.0, slope.est, use="na.or.complete")) %>%
-  select(scenarID, simID, rho.est.0, true.cor.0) %>%
-  distinct()
-
-rho.table <- rho.segreg %>% 
-  mutate(method="segreg") %>%
-  group_by(scenarID) %>% 
-  summarise(rho.est.mean.0 = mean(rho.est.0, na.rm=T), 
-            rho.est.sd.0 = sd(rho.est.0, na.rm=T)) %>%
-  inner_join(rho.seglme %>% mutate(method="seglme") %>% group_by(scenarID) %>%
-               summarise(rho.est.mean.0 = mean(rho.est.0, na.rm=T), 
-                         rho.est.sd.0 = sd(rho.est.0, na.rm=T)), by = "scenarID") %>%
-  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
-  mutate(segreg.rho.0 = paste0(round(rho.est.mean.0.x, 2), " (", round(rho.est.sd.0.x, 2), ")"),
-         seglme.rho.0 = paste0(round(rho.est.mean.0.y, 2), " (", round(rho.est.sd.0.y, 2), ")")
-         ) %>%
-  select(ends_with(".rho.0"), scenarLabel) %>%
+# table to display
+rho.table <- rho.seglme %>%
+  select(scenarID, starts_with("display")) %>%
+  left_join(
+    rho.segreg %>%
+      select(scenarID, starts_with("display")),
+    by=join_by("scenarID")
+  ) %>%
+  left_join(scenario.data %>% select(starts_with("scenar")), by = join_by("scenarID")) %>%
+  select(-scenarID) %>%
+  relocate(scenarLabel) %>%
   arrange(scenarLabel)
-
-
+# computation must be wrong (values to similar)
 
 rho.table %>%
   gt(
     rowname_col = "scenarLabel",
     row_group_as_column = TRUE
   ) %>%
-  tab_caption("Mean estimated slope-MEQ correlation (SE) for every DGM") %>%
+  # tab_caption("Mean estimated slope-MEQ correlation (SE) for every DGM") %>%
   # tab_header(title = "Mean estimated slope-MEQ correlation (SE) for every DGM") %>%
-  tab_stubhead(label = md("**DGM**")) %>%
-  tab_spanner(label=md("**corr = 0**"), columns=ends_with(".0")) %>%
+  tab_stubhead(label = md("<center><b>DGM</b></center>")) %>%
+  tab_spanner(label=md(sprintf("**corr = %s**",
+                               round(first(true.parameters$true.cor.0),2))),
+              columns=c("display.0.x", "display.0.y")) %>%
+  tab_spanner(label=md(sprintf("**corr = %s**",
+                               round(first(true.parameters$true.cor.0.2),2))),
+              columns=starts_with("display.0.2")) %>%
+  tab_spanner(label=md(sprintf("**corr = %s**",
+                               round(first(true.parameters$true.cor.0.5),2))),
+              columns=starts_with("display.0.5")) %>%
   cols_align(align = "left", columns = scenarLabel) %>%
-  tab_spanner(label=md(paste0("**corr = ", corr.meq,"**")), columns=ends_with(".rho")) %>%
   tab_options(table.font.size = 12) %>%
   opt_stylize(style = 1, color = "cyan")
+
+# EXPORT
+# rho.table %>%
+#   left_join(scenarTypst, by=join_by(scenarLabel)) %>%
+#   select(scenarTypst, starts_with("display.")) %>%
+#   write.csv(file = "tbls/corr-slope-meq.csv", row.names = FALSE)
 ```
 
 The most important thing to report here is the empirical SE of the correlation coefficients, which often has the same (or higher) order of magnitude than the point estimate itself. This displays an important heterogeneity, and inconsistencies among DGM and datasets.
@@ -960,8 +1072,4 @@ TODO - Correlation report:
 
 
 <!-- =========================================================== -->
-<!-- =========================================================== -->
-
-
-
 # References
