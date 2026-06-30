@@ -82,7 +82,7 @@ data(SDIpsilo, package = "lmbreak")
 # algorithm is sensible to starting points, let's give the real values for initialization first
 library(lmbreak)
 e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
-                    trace = FALSE)
+                    trace = FALSE, digits = 2)
 plot(e.XPall)
 breakpoints <- model.tables(e.XPall)[rep((1:15-1)*4,each=3)+2:4, 2]
 breakpoints <- matrix(breakpoints, ncol = 3, byrow = T) # breakpoints
@@ -124,13 +124,16 @@ for(ID in levels(SDIpsilo$id)){
 head(fit101.res[[11]]$psi.history)
 head(fit101.res[[15]]$psi.history)
 # both due to 2-periodic oscillations after init, in range of time domain and in order
-# CV OK // Continuity NOT OK in Brice's package
+# Figure out CV // Continuity in Brice's package
+summary(e.XPall)
 
 
 # to make it better:
-# - bootstrap restart ? study what and how - bootstrap on the initial breakpoint?
+# - bootstrap restart ? study what and how - bootstrap on the initial breakpoint? 
+#   -> explained in the mixed model paper
 # - look for a finer initialization than uniform (splines nadir, other...)
 # - in case of oscillation: one solution might be not practically relevant
 #   (negative or unordered breakpoints) while other could be ? heuristic
 
 # Add plot, summary, print methods (3)
+# would help simplify the analysis of results too

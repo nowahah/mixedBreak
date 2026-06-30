@@ -687,7 +687,7 @@ p +
              linetype = "dashed", linewidth = 1.2, colour = "yellow") +
   geom_hline(data = cover.conf.int, aes(yintercept = cover.95.up),
              linetype = "dashed", linewidth = 1.2, colour = "yellow")
-# ggsave("figs/zip-plateau-ref.png", width = 148, height = 105, units = "mm")
+# ggsave("figs/zip-plateau-all.png", width = 2*148, height = 2*105, units = "mm")
 ```
 
 The plateau model `segreg` also demonstrates substantial undercoverage.
@@ -769,16 +769,29 @@ formatted.res <- summ$summ  %>%
   rename(lower_seglme = lower_segmented.lme,
          upper_seglme = upper_segmented.lme) %>%
   mutate(
-    round.lme = -floor(log10(abs(mcse_segmented.lme))),
+    round.lme = 2, #-floor(log10(abs(mcse_segmented.lme))),
+    # 0-padding + rounding
     segmented.lme = paste0(round(est_segmented.lme, round.lme), " (", 
                            round(mcse_segmented.lme, round.lme), ")"),
-    round.seg = -floor(log10(abs(mcse_segreg))),
-    segreg = paste0(round(est_segreg, round.seg), " (", 
-                    round(mcse_segreg, round.seg), ")"),
+    segmented.lme = if_else(
+      mcse_segmented.lme < 10^(-round.lme),
+      paste0(format(est_segmented.lme, digits = round.lme), " (<", 10^(-round.lme), ")"),
+      paste0(
+        format(est_segmented.lme, digits = round.lme), " (",
+        format(round(mcse_segmented.lme, round.lme)), ")"
+      )),
+    round.seg = 2, # -floor(log10(abs(mcse_segreg))),
+    segreg = if_else(
+      mcse_segreg < 10^(-round.seg),
+      paste0(format(round(est_segreg, round.seg)), " (<", 10^(-round.seg), ")"),
+      paste0(
+        format(round(est_segreg, round.seg), digits = round.seg), " (",
+        format(round(mcse_segreg, round.seg)), ")"
+      )),
     bias_segreg.target = (lower_segreg < 0) & (0 < upper_segreg),
-    cover_segreg.target = (lower_segreg < 0.95) & (0.95 < upper_segreg),
+    cover_segreg.target = (lower_segreg < 1-typeIerr) & (1-typeIerr < upper_segreg),
     bias_seglme.target = (lower_seglme < 0) & (0 < upper_seglme),
-    cover_seglme.target = (lower_seglme < 0.95) & (0.95 < upper_seglme)
+    cover_seglme.target = (lower_seglme < 1-typeIerr) & (1-typeIerr < upper_seglme)
   )
 
 
@@ -830,6 +843,18 @@ formatted.res %>%
       columns = "seglme_cover",
       rows = formatted.res$cover_seglme.target[formatted.res$stat=="cover"] )
   )
+
+# EXPORT
+formatted.res %>%
+  select(stat, scenarLabel, segmented.lme, segreg) %>%
+  rename(seglme = segmented.lme) %>%
+  pivot_wider(names_from = stat, values_from = c("seglme", "segreg")) %>%
+  left_join(scenarTypst, by=join_by(scenarLabel)) %>%
+  select(scenarTypst, ends_with("_bias"), ends_with("_empse"), 
+         ends_with("_modelse"), ends_with("_cover")) %>%  
+  relocate(scenarTypst, ends_with("_bias"), ends_with("_cover"), 
+           ends_with("_empse"), ends_with("_modelse")) %>%
+  write.csv(file = "tbls/perf-mcse.csv", row.names = FALSE)
 ```
 
 <center>
