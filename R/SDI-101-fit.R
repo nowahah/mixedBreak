@@ -1,6 +1,6 @@
 
-# on purpose very simplified version of a fit taking as only formula
-# score ~ 0 + time
+# on purpose a very primal version of a fit taking as only formula
+# score ~ 0 + time (variable names should be intact too)
 # individual fit of 101 breakpoint model based on Muggeo's approach
 
 SDI101.fit <- function(psi0 = rep(NA_real_, 2), data = NA, tol.psi = 1e-3, 
@@ -77,10 +77,11 @@ library(lmbreak)
 library(ggplot2)
 library(dplyr)
 data(SDIpsilo, package = "lmbreak")
+SDIpsilo <- SDIpsilo[SDIpsilo$type %in% c("noise","trailing") == FALSE,]
+
 
 
 # algorithm is sensible to starting points, let's give the real values for initialization first
-library(lmbreak)
 e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
                     trace = FALSE, digits = 2)
 plot(e.XPall)
@@ -97,7 +98,7 @@ for(ID in levels(SDIpsilo$id)){
     geom_point()
   tryCatch({
     break101.fit <- SDI101.fit(data = SDI.ind, 
-                               psi0 = breakpoints[as.numeric(ID), 1:2],
+                               psi0 = breakpoints[as.numeric(ID), 1:2] + rnorm(2, sd = 2),
                                model = FALSE)
     fit101.res[[as.numeric(ID)]] <- break101.fit
   }, error = function(e){
@@ -120,12 +121,14 @@ for(ID in levels(SDIpsilo$id)){
   )
 }
 
-# warnings for individuals 11 and 15 (again)
+# warnings for individuals 11 and 15 (again) when we keep noise and trailing
 head(fit101.res[[11]]$psi.history)
-head(fit101.res[[15]]$psi.history)
+head(fit101.res[[15]]$psi.history) # CV when noise removed
 # both due to 2-periodic oscillations after init, in range of time domain and in order
-# Figure out CV // Continuity in Brice's package
 summary(e.XPall)
+# continuity = False means at least one Vs variable has not reach 0
+# can be due to oscillation between attractor states of the system, or non convergence
+# convergence is indicating if psi sequence admits a subsequential limit
 
 
 # to make it better:
