@@ -126,7 +126,7 @@ plot.break.lm <- function(z, breaks = T, fit = T, default = F,
     x <- z$x
     y <- z$y
     peak.y <- z$peak.y
-    psi <- z$psi
+    psi <- z$psi.i
     
     plot(x, y, pch = 20, ylim = c(0, max(10, peak.y)),
          main = "101 Model's fit",
@@ -157,28 +157,30 @@ plot.break.lme1 <- function(
 ) {
   require(ggplot2)
   require(dplyr)
-  model.plot <- z$model[,c("ID", "time", "response")]
+  vars <- z$var.name
+  model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))]
+  names(model.plot)[names(model.plot)==vars$group] <- "ID"
+  names(model.plot)[names(model.plot)==vars$response] <- "yy"
   model.plot$fitted <- z$fitted
-  model.plot$psi <- z$psi[model.plot$ID]
-  model.plot$psi.y <- (z$psi * z$random$time)[model.plot$ID]
-  model.plot <- model.plot %>%
-    group_by(ID) %>%
-    mutate(max.time = max(time))
-    
+  model.plot$psi <- z$psi.i[model.plot$ID]
+  model.plot$psi.y <- (z$psi.i * z$random$time)[model.plot$ID]
   
-  p <- ggplot(model.plot, aes(x=time, y=response)) +
+    
+  p <- ggplot(model.plot, aes(x=time, y=yy)) +
     geom_point() +
     facet_wrap(~ID) +
     xlab("Time since drug intake (minutes)") +
     ylab("SDI") + 
     scale_y_continuous(breaks = seq(0,20,by=2), limits = c(0, NA))
-
+  
   fit.data <- data.frame(
-    ID = levels(model.plot$ID),
-    psi = z$psi,
-    psi.y = z$psi * z$random$time,
-    max.time = (model.plot %>% group_by(ID) %>% summarise(max.time = max(time)))$max.time,
-    beta.2 = z$random$U + z$random$time
+    ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
+    psi = z$psi.i,
+    psi.y = z$psi.i * z$random$time,
+    max.time = (model.plot %>% 
+                  group_by(ID) %>% 
+                  summarise(max.time = max(time)))$max.time,
+    beta.2 = z$random$U1 + z$random$time
   ) %>% mutate(yend = psi.y + (max.time-psi)*beta.2)
   
   if (breaks) {
