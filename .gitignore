@@ -19,6 +19,7 @@ inst/*
 # Example code in package build process
 *-Ex.R
 *-test.R
+*dev.R
 
 # Output files from R CMD build
 /*.tar.gz

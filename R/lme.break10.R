@@ -1,9 +1,10 @@
-### lme.break1.R ---
-## * lme.break1 (documentation)
-##' @title Mixed-Effects Models with 1 breakpoint estimate
+### lme.break10.R ---
+## * lme.break10 (documentation)
+##' @title Mixed-Effects Models with 1 breakpoint estimate and constant second phase
 ##' @description This function fits a mixed-effects model with a single breakpoint estimate, 
 ##' in the formulation described in Muggeo (2014), 
-##' allowing for random effects on the breakpoint estimate.
+##' allowing for random effects on the breakpoint estimate. It enforces a plateau 
+##' (_i.e._ constant segment) in the second phase of the modeled relationship 
 ##'
 ##' @param formula a two-sided linear formula object describing both the fixed-effects 
 ##' and random-effects part of the model, with the response on the left of a ~ operator 
@@ -26,11 +27,11 @@
 # On purpose a very specific function to fit segmented relationship with a mixed
 # model and estimation a single breakpoint.
 library(lme4)
-library(rlang) # for some reaons is necessary for methods summary(lmer)
+library(rlang) # for some reasons is necessary for methods summary(lmer)
 
-## * lme.break1
+## * lme.break10
 ##' @export
-lme.break1 <- function(
+lme.break10 <- function(
     formula, data, psi0 = NA, tol.logLik = 1e-4, it.max = 10L,
     psi.history = TRUE, model = TRUE, x = FALSE, y = FALSE)
 {
@@ -63,7 +64,7 @@ lme.break1 <- function(
   names(XX)[names(XX)=="ID"] <- vars$group
   n.ind <- nlevels(XX[[vars$group]])
   n.psi <- 1 # FINAL - change for multiple breakpoints version
-
+  
   # 0. Initialization ====
   
   ## Fix a starting value for the change points
@@ -72,9 +73,9 @@ lme.break1 <- function(
       any(min(XX[[vars$segmented]]) > psi0) | 
       any(psi0 > max(XX[["time"]]))) {
     psi0 <- mean(range(XX[["time"]])) # uniform initialization for psi0
-    warning(sprintf(
-      "psi0 not specified: using psi0 = mean(range(time)) = %s for all individuals", 
-      format(psi0, digit=1))
+    warning(paste0(
+      "psi0 not specified: using psi0 = mean(range(", vars$segmented, 
+      sprintf(")) = %s for all individuals", format(psi0, digit=1)))
     )
   } else if ( !(length(psi0) %in% c(1,n.ind))) {
     warning(sprintf(
@@ -84,13 +85,14 @@ lme.break1 <- function(
   }
   if (length(psi0)==n.psi) { psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T) }
   
-  ## compute the U variate
-  XX$U1 <- pmax(0, XX[[vars$segmented]] - psi0[XX[[vars$group]],1])
-  vars$fixed <- c(vars$fixed, "U1")
-  vars$random <- c(vars$random, "U1")
+  ## compute the U variate - PLATEAU
+  XX$U1 <- XX[[vars$segmented]] - pmax(0, XX[[vars$segmented]] - psi0[XX[[vars$group]],1])
+  vars$fixed <- setdiff(c(vars$fixed, "U1"), vars$segmented)
+  vars$random <- setdiff(c(vars$random, "U1"), vars$segmented)
   # FINAL - rename U1-like variables to show segment number clearly: delta.time.2 / delta.2 ?
   
   ## fit the initial lmm
+  # browser()
   formula.init <- as.formula(paste(
     vars$response, "~", 
     paste(vars$fixed, collapse=" + "), "+ (",
@@ -103,6 +105,7 @@ lme.break1 <- function(
   vars$fixed <- c(vars$fixed, "G1")
   vars$random <- c(vars$random, "G1")
   # FINAL - rename G-like variables to show segment / breakpoint index clearly: psi.1 ?
+  # FINAL - add breakpoint random effect as an option ?
   
   # delta <- mod.init@beta[2:length(mod.init@beta)] # fixed-effects coefficients
   # coef(mod.init) # SUM of fixed and random-effects coefficients
@@ -130,23 +133,27 @@ lme.break1 <- function(
     it <- it + 1
     
     # 1. Compute covariates U, G and O ====
-    XX$U1 <- pmax(0, XX[[vars$segmented]] - psi.history[it,1,XX[[vars$group]]])
+    XX$U1 <- XX[[vars$segmented]] - pmax(0, XX[[vars$segmented]] - psi.history[it,1,XX[[vars$group]]])
     XX$V1 <- -1 * (XX[[vars$segmented]] > psi.history[it,1,XX[[vars$group]]])
     XX$D1 <- ((exp(eta.i) * (a2 - a1)) / (1 + exp(eta.i))^2)[XX[[vars$group]]]
-    XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1
-    XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1 # offset term
+    XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1 * (-1) # PLATEAU
+    # offset term
+    XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1
     XX[[vars$response]] <- data[[vars$response]] - XX$Off1
-    # FINAL - RENAME U, V, G, O - like variables
+    # FINAL - rename all variables
     
     
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
+    # browser()
+    # HERE - random effects variance is non significant during iterations
     mod.work <- suppressWarnings(suppressMessages(
       lme4::lmer(formula.it, data = XX, REML = TRUE)
-    )) 
+                 # control = lmerControl(autoscale = TRUE))
+    ))
     # message or warnings due to singular fits (induces by plateau setting, cor(time,U~=-1)
     logLik.diff <- (REMLcrit(mod.work) - REMLcrit(mod.work.prev))/(REMLcrit(mod.work.prev)+.1)
-
+    
     # 3. Extract the breakpoint linear predictor (fixed+random), update breakpoint estimates ====
     #    extract the difference-in-slopes (fixed+random)
     eta.i <- coef(mod.work)[[vars$group]]$G1
@@ -157,28 +164,34 @@ lme.break1 <- function(
   # END FOR
   
   # Return results ====
-  # browser()
+  browser()
   summ <- summary(mod.work)
-  rownames(summ$coefficients) <- c("time.beta.1", "time.delta.2", "psi.eta")
-  # removing the offset term
+  rownames(summ$coefficients) <- c("time.beta.1", "psi.eta")
+  # removing the offset term (restore original data)
   mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
   z <- list(
-    lme.fit = mod.work,
-    fixed = summ$coefficients,
-    random = coef(mod.work)[[vars$group]][, 1:(1+n.psi)],
-    psi.i = psi.history[it+1,1,],
+    fixed = fixef(mod.work), #summ$coefficients,
+    random = coef(mod.work)[[vars$group]][, 1:2],
+    psi.i = psi.history[it+1,1,], # FINAL
     fitted = mod.work@resp$mu,
     off = XX$Off[!is.na(data[[vars$response]])],
     logLik = logLik(mod.work),
     REML = REMLcrit(mod.work),
-    psi.history = psi.history[1:(it+1),1,],
+    psi.history = psi.history[1:(it+1),1,], # FINAL
     n.iter = it,
     call = cl,
     var.name = vars
   )
+  # browser()
   if(ret.y) z$y <- XX[[vars$response]]
-  if(model) z$model <- model.frame(mod.work)
+  if(model) {
+    z$model <- data.frame(
+      time = data[[vars$segmented]][!is.na(data[[vars$response]])],
+      model.frame(mod.work)
+    )
+    names(z$model)[1] <- vars$segmented
+  } 
   
-  class(z) <- append("break.lme1", class(z))
+  class(z) <- append("break.lme10", class(z))
   return(z)
 }
