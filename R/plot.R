@@ -149,14 +149,15 @@ plot.break.lm <- function(z, breaks = T, fit = T, default = F,
 }
 
 
-## Method for object of class 'break.lme1'
+## Method for object of class 'mixedBreak1'
 ##' @export
-plot.break.lme1 <- function(
+plot.mixedBreak1 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
     breaks.ci = FALSE, alpha = .65
 ) {
   require(ggplot2)
   require(dplyr)
+  pattern <- z$pattern
   vars <- z$var.name
   model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))]
   names(model.plot)[names(model.plot)==vars$group] <- "ID"
@@ -165,64 +166,6 @@ plot.break.lme1 <- function(
   model.plot$psi <- z$psi.i[model.plot$ID]
   model.plot$psi.y <- (z$psi.i * z$random$time)[model.plot$ID]
   
-    
-  p <- ggplot(model.plot, aes(x=time, y=yy)) +
-    geom_point() +
-    facet_wrap(~ID) +
-    xlab("Time since drug intake (minutes)") +
-    ylab("SDI") + 
-    scale_y_continuous(breaks = seq(0,14,by=2), limits = c(0, NA))
-  
-  fit.data <- data.frame(
-    ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
-    psi = z$psi.i,
-    psi.y = z$psi.i * z$random$time,
-    max.time = (model.plot %>% 
-                  group_by(ID) %>% 
-                  summarise(max.time = max(time)))$max.time,
-    beta.2 = z$random$U1 + z$random$time
-  ) %>% mutate(yend = psi.y + (max.time-psi)*beta.2)
-  
-  if (breaks) {
-    p <- p +
-      geom_point(aes(x = psi, y = psi.y), data = fit.data,
-                 colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      annotate(GeomPoint, x = 0, y = 0, 
-                 colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      geom_point(aes(x = max.time, y = yend), data = fit.data,
-                 colour = fit.color, shape = 18, size = 3, alpha = alpha)
-      
-  }
-  if (fit) {
-    p <- p +
-      geom_segment(aes(x=0, y=0, xend=psi, yend=psi.y), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha)  +
-      geom_segment(aes(x=psi, y=psi.y, xend=max.time, yend=yend), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha)
-  }
-  if (breaks.ci) {
-    warning("Parameter 'breaks.ci' is ignored at the moment")
-  }
-  
-  return(p)
-}
-
-## Method for object of class 'break.lme10'
-##' @export
-plot.break.lme10 <- function(
-    z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .65
-) {
-  require(ggplot2)
-  require(dplyr)
-  vars <- z$var.name
-  model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))] #PLATEAU
-  names(model.plot)[names(model.plot)==vars$group] <- "ID"
-  names(model.plot)[names(model.plot)==vars$response] <- "yy"
-  model.plot$fitted <- z$fitted
-  model.plot$psi <- z$psi.i[model.plot$ID]
-  model.plot$psi.y <- (z$psi.i * z$random$time)[model.plot$ID]
-  
   
   p <- ggplot(model.plot, aes(x=time, y=yy)) +
     geom_point() +
@@ -231,24 +174,30 @@ plot.break.lme10 <- function(
     ylab("SDI") + 
     scale_y_continuous(breaks = seq(0,14,by=2), limits = c(0, NA))
   
-  # PLATEAU - z$random$U1 <- z$random$time
+  
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
     psi = z$psi.i,
-    psi.y = z$psi.i * z$random$U1, 
+    psi.y = z$psi.i * z$random[[1]],
     max.time = (model.plot %>% 
                   group_by(ID) %>% 
-                  summarise(max.time = max(time)))$max.time,
-    beta.2 = z$random$U1 + z$random$U1
+                  summarise(max.time = max(time)))$max.time
   )
-  
+  fit.data <- fit.data %>%
+    mutate(
+      beta.2 = if_else(
+        rep(pattern=="11", nlevels(model.plot$ID)),
+        z$random$U1 + z$random[[1]], 0
+      ),
+      yend = psi.y + (max.time-psi)*beta.2)
+
   if (breaks) {
     p <- p +
       geom_point(aes(x = psi, y = psi.y), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha) +
       annotate(GeomPoint, x = 0, y = 0, 
                colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      geom_point(aes(x = max.time, y = psi.y), data = fit.data,
+      geom_point(aes(x = max.time, y = yend), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     
   }
@@ -256,7 +205,7 @@ plot.break.lme10 <- function(
     p <- p +
       geom_segment(aes(x=0, y=0, xend=psi, yend=psi.y), data = fit.data,
                    colour = fit.color, lwd = 1, alpha = alpha)  +
-      geom_segment(aes(x=psi, y=psi.y, xend=max.time, yend=psi.y), data = fit.data,
+      geom_segment(aes(x=psi, y=psi.y, xend=max.time, yend=yend), data = fit.data,
                    colour = fit.color, lwd = 1, alpha = alpha)
   }
   if (breaks.ci) {

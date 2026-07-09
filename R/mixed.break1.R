@@ -1,5 +1,5 @@
-### lme.break1.R ---
-## * lme.break1 (documentation)
+### mixed.break1.R ---
+## * mixed.break1 (documentation)
 ##' @title Mixed-Effects Models with 1 breakpoint estimate
 ##' @description This function fits a mixed-effects model with a single breakpoint estimate, 
 ##' in the formulation described in Muggeo (2014), 
@@ -17,10 +17,10 @@
 ##' It must be a numeric value in the range of the `time` (segmented) variable. Default is the 
 ##' middle of the observed values for `time` (`mean(range(time))`).
 ##' @param it.max [integer>0] Maximum number of iterations allowed.
-##' @param model,x,y [logicals] If TRUE the corresponding components of the fit 
-##' (the model frame, the model matrix, the response) are returned.
+##' @param x,y [logicals] If TRUE the corresponding components of the fit 
+##' (the model matrix, the response) are returned.
 ##'
-##' @return nothing
+##' @return TODO
 
 
 # On purpose a very specific function to fit segmented relationship with a mixed
@@ -28,12 +28,17 @@
 library(lme4)
 library(rlang) # for some reaons is necessary for methods summary(lmer)
 
-## * lme.break1
+## * mixed.break1
 ##' @export
-lme.break1 <- function(
-    formula, data, psi0 = NA, tol.logLik = 1e-4, it.max = 10L,
-    psi.history = TRUE, model = TRUE, x = FALSE, y = FALSE)
+mixed.break1 <- function(
+    formula, data, psi0 = NA, tol.logLik = 1e-4, it.max = 10L, pattern = "11",
+    psi.history = TRUE, x = FALSE, y = FALSE)
 {
+  if(!(pattern %in% c("11", "10")))
+    stop(paste("'pattern' should either be: \n",
+               "-'11' for two non-null slopes estimated) ;\n",
+               "-'10' for one non-null slope followed by a constant segment"))
+  
   # Input handling ====
   ret.x <- x
   ret.y <- y
@@ -50,7 +55,14 @@ lme.break1 <- function(
   vars$random <- form.label[stringr::str_detect(form.label, stringr::fixed("|"))]
   vars$random <- strsplit(vars$random, split = " | ", fixed=TRUE)[[1]]
   vars$group <- vars$random[2]
-  vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]] # one grouping variable
+  vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]] 
+  # one single grouping variable allowed
+  
+  # stopifnot(exprs = {
+  #   is.logical(ret.x),
+  #   is.logical(ret.y),
+  #   rlang::is_formula(formula),
+  # })
   
   # model frame
   XX <- data.frame(
@@ -63,7 +75,7 @@ lme.break1 <- function(
   names(XX)[names(XX)=="ID"] <- vars$group
   n.ind <- nlevels(XX[[vars$group]])
   n.psi <- 1 # FINAL - change for multiple breakpoints version
-
+  
   # 0. Initialization ====
   
   ## Fix a starting value for the change points
@@ -72,15 +84,16 @@ lme.break1 <- function(
       any(min(XX[[vars$segmented]]) > psi0) | 
       any(psi0 > max(XX[["time"]]))) {
     psi0 <- mean(range(XX[["time"]])) # uniform initialization for psi0
-    warning(sprintf(
+    message(sprintf(
       "psi0 not specified: using psi0 = mean(range(time)) = %s for all individuals", 
       format(psi0, digit=1))
     )
   } else if ( !(length(psi0) %in% c(1,n.ind))) {
     warning(sprintf(
-      "Only a single breakpoint is allowed for `lme.break1`. \nUsing psi0[1] = %s instead.",
-      psi0[1])
+      "Only a single breakpoint is allowed for `lme.break1`.
+      Using psi0[1] = %s instead.", psi0[1])
     )
+    psi0 <- psi0[1]
   }
   if (length(psi0)==n.psi) { psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T) }
   
@@ -88,6 +101,11 @@ lme.break1 <- function(
   XX$U1 <- pmax(0, XX[[vars$segmented]] - psi0[XX[[vars$group]],1])
   vars$fixed <- c(vars$fixed, "U1")
   vars$random <- c(vars$random, "U1")
+  if(pattern=="10"){  # PLATEAU
+    XX$U1 <- XX[[vars$segmented]] - XX$U1
+    vars$fixed <- setdiff(vars$fixed, vars$segmented)
+    vars$random <- setdiff(vars$fixed, vars$segmented)
+  }  
   # FINAL - rename U1-like variables to show segment number clearly: delta.time.2 / delta.2 ?
   
   ## fit the initial lmm
@@ -134,11 +152,14 @@ lme.break1 <- function(
     XX$V1 <- -1 * (XX[[vars$segmented]] > psi.history[it,1,XX[[vars$group]]])
     XX$D1 <- ((exp(eta.i) * (a2 - a1)) / (1 + exp(eta.i))^2)[XX[[vars$group]]]
     XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1
+    if(pattern=="10") { # PLATEAU
+      XX$U1 <- XX[[vars$segmented]] - XX$U1
+      XX$G1 <- (-1)*XX$G1
+    }
     XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1 # offset term
     XX[[vars$response]] <- data[[vars$response]] - XX$Off1
     # FINAL - RENAME U, V, G, O - like variables
-    
-    
+
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
     mod.work <- suppressWarnings(suppressMessages(
@@ -146,7 +167,7 @@ lme.break1 <- function(
     )) 
     # message or warnings due to singular fits (induces by plateau setting, cor(time,U~=-1)
     logLik.diff <- (REMLcrit(mod.work) - REMLcrit(mod.work.prev))/(REMLcrit(mod.work.prev)+.1)
-
+    
     # 3. Extract the breakpoint linear predictor (fixed+random), update breakpoint estimates ====
     #    extract the difference-in-slopes (fixed+random)
     eta.i <- coef(mod.work)[[vars$group]]$G1
@@ -157,9 +178,15 @@ lme.break1 <- function(
   # END FOR
   
   # Return results ====
-  # browser()
   summ <- summary(mod.work)
-  rownames(summ$coefficients) <- c("time.beta.1", "time.delta.2", "psi.eta")
+  if(pattern=="10") { # PLATEAU
+    rownames(summ$coefficients) <- c(vars$segmented, "(logit.)break.1") # PSILINK 
+  } else {
+    rownames(summ$coefficients) <- c(
+      paste0(vars$segmented, c(".beta.1", paste0(".delta.", 2:nchar(pattern)))), 
+      "(logit.)break.1" # PSILINK 
+    ) 
+  }
   # removing the offset term
   mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
   z <- list(
@@ -174,11 +201,17 @@ lme.break1 <- function(
     psi.history = psi.history[1:(it+1),1,],
     n.iter = it,
     call = cl,
-    var.name = vars
+    var.name = vars,
+    pattern = pattern
   )
   if(ret.y) z$y <- XX[[vars$response]]
-  if(model) z$model <- model.frame(mod.work)
   
-  class(z) <- append("break.lme1", class(z))
+  model <- model.frame(mod.work)
+  if(pattern=="10"){
+    model[[vars$segmented]] <- data[[vars$segmented]][!is.na(data[[vars$response]])]
+  }
+  z$model <- model
+  
+  class(z) <- append("mixedBreak1", class(z)) 
   return(z)
 }
