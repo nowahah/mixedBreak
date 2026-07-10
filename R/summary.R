@@ -48,16 +48,19 @@ summary.mixedBreak1 <- function(z, pattern = "11", default = FALSE){
   
   cat("\n")
   cat("Random effects:\n")
-  tmp <- summary(x)$varcor[[z$var.name$group]]
-  dim(attr(tmp, "stddev")) <- c(1, length(attr(tmp, "stddev")))
-  if(pattern=="11"){
-    colnames(attr(tmp, "stddev")) <- c("time.beta.1", "time.delta.2", "break.1")
-  } else {
-    colnames(attr(tmp, "stddev")) <- c("time.beta.1", "break.1")
-  }
-  rownames(attr(tmp, "stddev")) <- "StdDev:"
-  print(attr(tmp, "stddev"))
-  # FINAL - adapt names like below
+  tmp <- VarCorr(x) #[[z$var.name$group]]
+  # # dim(attr(tmp, "stddev")) <- c(1, length(attr(tmp, "stddev")))
+  # if(pattern=="11"){
+  #   colnames(tmp) <- rownames(tmp) <- c("time.beta.1", "time.delta.2", "break.1")
+  #   # colnames(attr(tmp, "stddev")) <- c("time.beta.1", "time.delta.2", "break.1")
+  # } else {
+  #   colnames(tmp) <- rownames(tmp) <- c("time.beta.1", "break.1")
+  #   # colnames(attr(tmp, "stddev")) <- c("time.beta.1", "break.1")
+  # }
+  # # rownames(attr(tmp, "stddev")) <- "StdDev:"
+  print(tmp)
+  # print(attr(tmp, "stddev"))
+  # FINAL - adapt names of variables for printing like below
   
   cat("\nFixed effects:\n")
   # differentiate the segment with good variable names only ?
@@ -77,11 +80,23 @@ summary.mixedBreak1 <- function(z, pattern = "11", default = FALSE){
   print(mod.coef) # TODO - psi is still on logit scale
   cat(" psi.link = logit\n")
   
+  n.obs <- x@devcomp$dims[["N"]]
+  n.group <- nlevels(x@frame[,names(x@cnms)])
+  t.val <- summary(z$lme.fit.check)$coefficients["VD1", "t value"]
+  p.val <- pt(t.val, df = n.obs - (n.group + length(x@beta)) + 1) # signifiance of eta
+  if(p.val < 0.05) {
+    eta.flag <- "YES"
+  } else {
+    eta.flag <- "NO"
+  }
+  cat("\ndelta*(eta-tilde(eta)) is significantly different from 0 at convergence:", eta.flag,
+      "( p.value =", p.val, ")\n")
+  
   # TODO - check validity since Muggeo excluded breakpoint estimate from the fit here
   # cat("\nStandardized Within-Group Residuals:\n")
   # print(resd)
-  cat("\nNumber of Observations:", x@devcomp$dims[["N"]])
-  cat("\nNumber of Groups:", nlevels(x@frame[,names(x@cnms)]), "\n")
+  cat("\nNumber of Observations:", n.obs)
+  cat("\nNumber of Groups:", n.group, "\n")
   
   invisible(z)
 }

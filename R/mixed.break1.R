@@ -109,23 +109,31 @@ mixed.break1 <- function(
   # FINAL - rename U1-like variables to show segment number clearly: delta.time.2 / delta.2 ?
   
   ## fit the initial lmm
+  warn.list <- list()
+  err.list <- list()
   formula.init <- as.formula(paste(
     vars$response, "~", 
     paste(vars$fixed, collapse=" + "), "+ (",
     paste(paste(vars$random, collapse=" + "), vars$group, sep = " | "), ")")
   )
-  mod.init <- suppressWarnings(
-    lme4::lmer(formula.init, data = XX, REML = TRUE)
-  )
+  tryCatch(
+    mod.init <<- suppressMessages(lme4::lmer(formula.init, data = XX, REML = TRUE)),
+    warning = function(w){
+      warn.list$init <<- w$message
+      mod.init <<- suppressWarnings(suppressMessages(
+        lme4::lmer(formula.init, data = XX, REML = TRUE)
+      ))
+    },
+    error = function(e){
+      stop(e$message)
+    }
+  ) 
   mod.work <- mod.init
   vars$fixed <- c(vars$fixed, "G1")
   vars$random <- c(vars$random, "G1")
   # FINAL - rename G-like variables to show segment / breakpoint index clearly: psi.1 ?
   
-  # delta <- mod.init@beta[2:length(mod.init@beta)] # fixed-effects coefficients
-  # coef(mod.init) # SUM of fixed and random-effects coefficients
-  # t(t(coef(mod.init)[[vars$group]]) - mod.init@beta) # random-effects coefficients (time, U)
-  delta.i <- coef(mod.init)[[vars$group]]$U1 # FINAL - U1 name
+  delta.i <- coef(mod.init)[[vars$group]]$U1 # FINAL - U1 name - sum of fixed & random coef
   
   # time-scale transformation for breakpoints
   a1 <- min(XX[[vars$segmented]])
@@ -162,9 +170,20 @@ mixed.break1 <- function(
 
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
-    mod.work <- suppressWarnings(suppressMessages(
-      lme4::lmer(formula.it, data = XX, REML = TRUE)
-    )) 
+    tryCatch(
+      mod.work <- suppressMessages(lme4::lmer(formula.it, data = XX, REML = TRUE)),
+      warning = function(w){
+        warn.list[[it]] <<- w$message
+        names(warn.list)[length(warn.list)] <<- it
+        mod.work <<- suppressWarnings(suppressMessages(
+          lme4::lmer(formula.it, data = XX, REML = TRUE)
+        ))
+      },
+      error = function(e){
+        # err.list[[it]] <<- e$message
+        stop("Error during LMM estimation: ", e$message)
+      }
+    ) 
     # message or warnings due to singular fits (induces by plateau setting, cor(time,U~=-1)
     logLik.diff <- (REMLcrit(mod.work) - REMLcrit(mod.work.prev))/(REMLcrit(mod.work.prev)+.1)
     
@@ -176,6 +195,25 @@ mixed.break1 <- function(
     
   }
   # END FOR
+  # print warning message at convergence if any
+  if(it %in% names(warn.list)) {
+    warning("Warning at convergence during last LMM estimation: \n    ", warn.list[[it]])
+  }
+  
+  # At convergence, does delta*(eta-tilde(eta)) approaches 0 ?
+  # browser()
+  XX$VD1 <- XX$V1 * XX$D1
+  XX[[vars$response]] <- data[[vars$response]]
+  formula.check <- stringr::str_replace_all(as.character(formula.it), "G1", "VD1")
+  formula.check <- as.formula(paste(formula.check[2], formula.check[1], formula.check[3]))
+  # mod.check <- lme4::lmer(formula.check, data = XX, REML = TRUE,
+  #                         control = lmerControl(optCtrl=list(xtol_abs=1e-8, ftol_abs=1e-8)))
+  mod.check <- lme4::lmer(formula.check, data = XX, REML = TRUE,
+                          control = lmerControl(optimizer = "nlminbwrap"))
+  # summary(mod.check) # look for signifiance of VD1 coefficient
+  #FINAL - adapt to multiple breakpoints
+  
+  # HERE - add the last model for checking that delta*(eta-tilde(eta)) is close to zero
   
   # Return results ====
   summ <- summary(mod.work)
@@ -202,7 +240,9 @@ mixed.break1 <- function(
     n.iter = it,
     call = cl,
     var.name = vars,
-    pattern = pattern
+    pattern = pattern,
+    warn.list = warn.list,
+    lme.fit.check = mod.check
   )
   if(ret.y) z$y <- XX[[vars$response]]
   
