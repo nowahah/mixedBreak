@@ -1,12 +1,12 @@
-### confint.break.lme1.R ---
-## * confint.break.lme1 (documentation)
+### confint.mixedBreak.R ---
+## * confint.mixedBreak (documentation)
 ##' @title Confidence Intervals in segmented Mixed-Models
 ##' @description Computes confidence intervals for all regression parameters, 
 ##' including the breakpoint, in a fitted ‘segmented mixed’ model.
 
-## Method for object of class 'mixedBreak1'
+## Method for object of class 'mixedBreak'
 ##' @export
-confint.mixedBreak1 <- function(object, level = 0.95){
+confint.mixedBreak <- function(object, level = 0.95){
   fixed <- lme4::fixef(object$lme.fit)
   fixed.se <- object$fixed[,"Std. Error"]
   

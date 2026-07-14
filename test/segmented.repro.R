@@ -27,7 +27,7 @@ plot(segmented.fit, vline = TRUE)
 # Here the displayed individuals breakpoint values are close to identical
 # whereas in the actual estimation psi.i, they are much more spread out.
 
-# The problem appears to come from line ~66 in plot.segmented.lme function :
+# The problem appears to come from lines 65-67 in plot.segmented.lme function :
 # when extracting individuals psi from the fitted object with obj$misc$matrix.psi[, 1]
 # # HERE - psi used are != obj$psi.i
 # # psi <- if (ncol(obj$misc$matrix.psi) <= 1) 
