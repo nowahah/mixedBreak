@@ -1,27 +1,31 @@
 ### mixed.break.R ---
 ## * mixed.break (documentation)
-##' @title Mixed-Effects Models with 1 breakpoint estimate
-##' @description This function fits a mixed-effects model with a single
-##' breakpoint estimate, in the formulation described in Muggeo (2014), 
-##' allowing for random effects on the breakpoint estimate.
+##' @title Mixed-Effects Models with 1 or 2 breakpoint estimates
+##' @description This function fits a mixed-effects model with one or two
+##' breakpoint estimates, in the formulation described in Muggeo (2014), 
+##' allowing for random effects on the breakpoint estimates.
 ##'
 ##' @param formula a two-sided linear formula object describing both the 
 ##' fixed-effects and random-effects part of the model, with the response on 
 ##' the left of `~` operator and the terms, separated by + operators, on the 
 ##' right. Random-effects terms are distinguished by vertical bars (|) 
 ##' separating expressions for design matrices from grouping factors. 
-##' By default, non-scalar random effects (where the design matrix has more 
-##' than one column, e.g. (1+x|f)) are fitted with unstructured (general 
-##' positive semidefinite) covariance matrices.
 ##' @param data a data frame containing variables named in `formula`.
 ##' @param psi0 [numeric] an optional starting value for the breakpoint 
 ##' estimates (first guess). 
 ##' It must be a numeric value in the range of the segmented variable. 
 ##' Default is the middle of the observed segmented variable values 
 ##' (`mean(range(time))`).
-##' @param pattern [character "11" | "10"] One of the two following options: \itemize{
-##' \item '11' for two non-null slopes estimated ;\n",
-##' \item '10' for one non-null slope followed by a constant segment"
+##' @param pattern [character] One of the two following options: \itemize{
+##' \item '11' for a two-phases relationship with both slopes estimated 
+##' (assumed non-null) ;\n
+##' \item '10' for a two-phases relationship with a non-null slope followed by
+##'  a constant segment (second-phase slope is forced to 0) ;\n
+##' \item '111' for a three-phases relationship with all 3 slopes estimated 
+##' (assumed non-null) ;\n
+##' \item '101' for a three-phases relationship with one non-null slope 
+##' followed by a constant segment (second phase slope is forced to 0) and 
+##' another non-null slope.
 ##' }
 ##' @param it.max [integer>0] Maximum number of iterations allowed. Default to
 ##' 10. A warning is emitted is the maximum number of iterations is reached.
@@ -32,12 +36,14 @@
 
 
 # On purpose a very specific function to fit segmented relationship with a mixed
-# model and estimation a single breakpoint.
+# model and estimation a single breakpoint. Pattern can be either of four 
+# options in c("11", "10", "101", "111").
 
 ## * mixed.break
 ##' @export
 mixed.break <- function(
-    formula, data, pattern = NA, psi0 = NA, tol.logLik = 1e-4, it.max = 10L,
+    formula, data, pattern = NA, psi0 = NA, psi.range = NULL,
+    tol.logLik = 1e-4, it.max = 10L, 
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
   if(!(pattern %in% c("11", "10", "111", "101")))
@@ -45,6 +51,11 @@ mixed.break <- function(
       "'pattern' should either be one of four options:",
       "c(\"11\", \"10\", \"111\", \"101\").\n  See documentation for signification."))
   
+  if(!is.null(psi.range) & !any(c("q.prob", "value") %in% names(psi.range)))
+    stop(paste(
+      "When specified, `psi.range` must have at least one of:",
+      "c(\"q.prob\", \"value\") as name."
+    ))
   # Input handling ====
   ret.x <- x
   ret.y <- y
@@ -90,7 +101,7 @@ mixed.break <- function(
     psi0.ok <- FALSE
   } else if ( !(length(psi0) %in% c(n.psi ,n.ind, n.psi*n.ind))) {
     warning(sprintf(
-      "`length(psi0) doesn't match n.psi (%s), n.ind (%s), nor n.psi * n.ind (%s)", 
+      "`length(psi0)` doesn't match any of n.psi (%s), n.ind (%s), n.psi * n.ind (%s)", 
       n.psi ,n.ind, n.psi*n.ind)
     )
     psi0.ok <- FALSE
@@ -152,7 +163,29 @@ mixed.break <- function(
   # sum of fixed & random coef
   
   # time-scale transformation for breakpoints
-  psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
+  # browser()
+  if(is.null(psi.range)){
+    # default 10-90%
+    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
+  } else if ("q.prob" %in% names(psi.range)) {
+    psi.range <- unname(quantile(XX[[vars$segmented]], probs = psi.range[["q.prob"]]))
+  } else if ("value" %in% names(psi.range)) {
+    psi.range <- psi.range[["value"]]
+    stopifnot( length(psi.range)==2 & is.numeric(psi.range) )
+    if(psi.range[1] < min(XX[[vars$segmented]]) | 
+       psi.range[2] > max(XX[[vars$segmented]])){
+      
+      psi.range[1] <- max(psi.range[1], min(XX[[vars$segmented]]))
+      psi.range[2] <- min(psi.range[2], max(XX[[vars$segmented]]))
+      
+      message(sprintf(paste(
+        "`psi.range` specifies values out of observed segmented variable `%s` range.\n",
+        "  Projecting `psi.range` onto observed range: `psi.range` = c(%s)"
+        ), vars$segmented, paste(psi.range, collapse = ", "))
+      )
+    }
+  }
+  
   logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
   expit <- function(eta) return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
   eta.i <- logit(psi0)
@@ -278,9 +311,6 @@ mixed.break <- function(
     }
   ) 
   
-  
-  # summary(mod.check) # look for signifiance of VD1 coefficient
-  # FINAL - adapt to multiple breakpoints
   
   # Return results ====
   # browser()
