@@ -44,7 +44,7 @@ mixed.break1 <- function(
     stop(paste("'pattern' should either be: \n",
                "-'11' for two non-null slopes estimated ;\n",
                "-'10' for one non-null slope followed by a constant segment"))
-  
+
   # Input handling ====
   ret.x <- x
   ret.y <- y
@@ -54,7 +54,7 @@ mixed.break1 <- function(
   vars$response <- as.character(formula[[2]])
   form.label <- attr(terms(formula), "term.labels")
   vars$fixed <- form.label[!stringr::str_detect(form.label, stringr::fixed("|"))]
-  if(!attr(terms(formula), "intercept")){ 
+  if(!attr(terms(formula), "intercept")){
     vars$fixed <- c(vars$fixed, "0") 
   }
   vars$segmented <- vars$fixed[1]
@@ -71,6 +71,7 @@ mixed.break1 <- function(
   # })
   
   # model frame
+  # browser()
   XX <- data.frame(
     y = data[[vars$response]],
     time = data[[vars$segmented]],
@@ -80,7 +81,7 @@ mixed.break1 <- function(
   names(XX)[1] <- vars$response
   names(XX)[names(XX)=="ID"] <- vars$group
   n.ind <- nlevels(XX[[vars$group]])
-  n.psi <- 1 # FINAL - change for multiple breakpoints version
+  n.psi <- 1 # FINAL - change for multiple breakpoints version nchar(pattern)
   
   # 0. Initialization ====
   
@@ -99,7 +100,7 @@ mixed.break1 <- function(
       "Only a single breakpoint is allowed for `lme.break1`.
       Using psi0[1] = %s instead.", psi0[1])
     )
-    psi0 <- psi0[1]
+    psi0 <- psi0[1] # n.psi
   }
   if (length(psi0)==n.psi) psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T)
   
@@ -116,7 +117,6 @@ mixed.break1 <- function(
   
   ## fit the initial lmm
   warn.list <- list()
-  err.list <- list()
   formula.init <- as.formula(paste(
     vars$response, "~", 
     paste(vars$fixed, collapse=" + "), "+ (",
@@ -136,14 +136,12 @@ mixed.break1 <- function(
   )
   if(dev.step==-1) return(mod.init)
   mod.work <- mod.init
-  vars$fixed <- c(vars$fixed, "G1")
-  vars$random <- c(vars$random, "G1")
-  # FINAL - rename G-like variables to show breakpoint index clearly: psi.1 / break.1 ?
   
   delta.i <- coef(mod.init)[[vars$group]]$U1 
   # FINAL - U1 name - sum of fixed & random coef
   
   # time-scale transformation for breakpoints
+  
   a1 <- min(XX[[vars$segmented]])
   a2 <- max(XX[[vars$segmented]])
   logit <- function(psi) return( log((psi-a1)/(a2-psi)) )
@@ -156,6 +154,8 @@ mixed.break1 <- function(
   logLik.diff <- tol.logLik + 1
   psi.history <- array(NA_real_, dim = c(it.max+1, n.psi, n.ind))
   psi.history[1,,] <- psi0
+  vars$fixed <- c(vars$fixed, "G1") # n.psi
+  vars$random <- c(vars$random, "G1") # rename G-like with break.12 ?
   formula.it <- as.formula(paste(
     vars$response, "~", 
     paste(vars$fixed, collapse=" + "), "+ (",
@@ -189,7 +189,6 @@ mixed.break1 <- function(
         ))
       },
       error = function(e){
-        # err.list[[it]] <<- e$message
         stop("Error during LMM estimation: ", e$message)
       }
     ) 
@@ -205,7 +204,7 @@ mixed.break1 <- function(
     eta.i <- coef(mod.work)[[vars$group]]$G1
     psi.history[it+1,1,] <- expit(eta.i)
     delta.i <- coef(mod.work)[[vars$group]]$U1
-    
+    # browser()
   }
   # END FOR
   # print warning message at convergence if any
@@ -275,7 +274,8 @@ mixed.break1 <- function(
     var.name = vars,
     pattern = pattern,
     warn.list = warn.list,
-    lme.fit.check = mod.check
+    lme.fit.check = mod.check,
+    range.psi = c(a1, a2)
   )
   if(ret.y) z$y <- XX[[vars$response]]
   
@@ -286,5 +286,6 @@ mixed.break1 <- function(
   z$model <- model
   
   class(z) <- append(c("mixedBreak", "mixedBreak1"), class(z)) 
+  # z.it <<- append(z.it, list(z)); plot(z)
   return(z)
 }

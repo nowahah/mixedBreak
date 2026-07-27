@@ -1,31 +1,27 @@
 ### mixed.break.R ---
 ## * mixed.break (documentation)
-##' @title Mixed-Effects Models with 1 or 2 breakpoint estimates
-##' @description This function fits a mixed-effects model with one or two
-##' breakpoint estimates, in the formulation described in Muggeo (2014), 
-##' allowing for random effects on the breakpoint estimates.
+##' @title Mixed-Effects Models with 1 breakpoint estimate
+##' @description This function fits a mixed-effects model with a single
+##' breakpoint estimate, in the formulation described in Muggeo (2014), 
+##' allowing for random effects on the breakpoint estimate.
 ##'
 ##' @param formula a two-sided linear formula object describing both the 
 ##' fixed-effects and random-effects part of the model, with the response on 
 ##' the left of `~` operator and the terms, separated by + operators, on the 
 ##' right. Random-effects terms are distinguished by vertical bars (|) 
 ##' separating expressions for design matrices from grouping factors. 
+##' By default, non-scalar random effects (where the design matrix has more 
+##' than one column, e.g. (1+x|f)) are fitted with unstructured (general 
+##' positive semidefinite) covariance matrices.
 ##' @param data a data frame containing variables named in `formula`.
 ##' @param psi0 [numeric] an optional starting value for the breakpoint 
 ##' estimates (first guess). 
 ##' It must be a numeric value in the range of the segmented variable. 
 ##' Default is the middle of the observed segmented variable values 
 ##' (`mean(range(time))`).
-##' @param pattern [character] One of the two following options: \itemize{
-##' \item '11' for a two-phases relationship with both slopes estimated 
-##' (assumed non-null) ;\n
-##' \item '10' for a two-phases relationship with a non-null slope followed by
-##'  a constant segment (second-phase slope is forced to 0) ;\n
-##' \item '111' for a three-phases relationship with all 3 slopes estimated 
-##' (assumed non-null) ;\n
-##' \item '101' for a three-phases relationship with one non-null slope 
-##' followed by a constant segment (second phase slope is forced to 0) and 
-##' another non-null slope.
+##' @param pattern [character "11" | "10"] One of the two following options: \itemize{
+##' \item '11' for two non-null slopes estimated ;\n",
+##' \item '10' for one non-null slope followed by a constant segment"
 ##' }
 ##' @param it.max [integer>0] Maximum number of iterations allowed. Default to
 ##' 10. A warning is emitted is the maximum number of iterations is reached.
@@ -36,25 +32,18 @@
 
 
 # On purpose a very specific function to fit segmented relationship with a mixed
-# model and estimation a single breakpoint. Pattern can be either of four 
-# options in c("11", "10", "101", "111").
+# model and estimation a single breakpoint.
 
 ## * mixed.break
 ##' @export
 mixed.break <- function(
-    formula, data, pattern, psi0 = NA, tol.logLik = 1e-4, it.max = 10L, 
+    formula, data, pattern = NA, psi0 = NA, tol.logLik = 1e-4, it.max = 10L,
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
-  if(!(pattern %in% c("11", "10", "101", "111"))){
+  if(!(pattern %in% c("11", "10", "111", "101")))
     stop(paste(
-      "Argument 'pattern' should be one of c(\"11\", \"10\", \"101\", \"111\") \n"
-      # "-'111' for three non-null slopes estimated (unconstrained 3 segments) ;\n",
-      # "-'101' for one non-null slope followed by a constant segment,",
-      # "then another non-null segment"
-    ))
-  }
-  require(dplyr)
-  browser()
+      "'pattern' should either be one of four options:",
+      "c(\"11\", \"10\", \"111\", \"101\").\n  See documentation for signification."))
   
   # Input handling ====
   ret.x <- x
@@ -65,7 +54,7 @@ mixed.break <- function(
   vars$response <- as.character(formula[[2]])
   form.label <- attr(terms(formula), "term.labels")
   vars$fixed <- form.label[!stringr::str_detect(form.label, stringr::fixed("|"))]
-  if(!attr(terms(formula), "intercept")){ 
+  if(!attr(terms(formula), "intercept")){
     vars$fixed <- c(vars$fixed, "0") 
   }
   vars$segmented <- vars$fixed[1]
@@ -76,6 +65,7 @@ mixed.break <- function(
   # one single grouping variable assumed
   
   # model frame
+  # browser()
   XX <- data.frame(
     y = data[[vars$response]],
     time = data[[vars$segmented]],
@@ -86,53 +76,53 @@ mixed.break <- function(
   names(XX)[names(XX)=="ID"] <- vars$group
   n.ind <- nlevels(XX[[vars$group]])
   n.psi <- nchar(pattern) - 1L
+  n.obs <- nrow(XX)
+  plateau <- (substr(pattern, 2L, 2L) == "0")
 
   # 0. Initialization ====
   
   ## Fix a starting value for the change points
-  # should be numeric in the range of segmented variable (time)
   psi0.ok <- TRUE
+  # should be numeric in the range of segmented variable (time)
   if (!is.numeric(psi0) | 
       any(min(XX[[vars$segmented]]) > psi0) | 
       any(max(XX[[vars$segmented]]) < psi0)) {
     psi0.ok <- FALSE
-  } else if ( !(length(psi0) %in% c(n.psi, n.psi*n.ind))) {
+  } else if ( !(length(psi0) %in% c(n.psi ,n.ind, n.psi*n.ind))) {
     warning(sprintf(
-      paste0("length(psi0) (%o) doesn't match n.psi (%s) nor n.ind * n.psi (%s)"),
-      length(psi0), n.psi, n.psi*n.ind)
+      "`length(psi0) doesn't match n.psi (%s), n.ind (%s), nor n.psi * n.ind (%s)", 
+      n.psi ,n.ind, n.psi*n.ind)
     )
     psi0.ok <- FALSE
   }
-  # catching wrong psi0 initialization
-  if(!psi0.ok) {
-    # uniform initialization for psi0
-    psi0 <- quantile(XX[[vars$segmented]], probs = (1:n.psi)/(n.psi+1))
+  
+  # uniform initialization for psi0
+  if(!psi0.ok){
+    psi0 <- unname(quantile(XX[[vars$segmented]], probs = 1:n.psi/(n.psi+1)))
     message(paste0(
       "psi0 incorrectly (not numeric / out of range of `", vars$segmented,
-      "`) or not specified: \nUsing uniform initialization for all ",
+      "`) or not specified: \n  Using uniform initialization for all ",
       "individuals: psi0 = c(", paste0(format(psi0, digit=1), collapse = ", "), ")"
     ))
   }
   if (length(psi0)==n.psi) psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T)
-  # dim(psi0) = c(n.ind, n.psi)
   
-  ## compute the U variables
-  addU0var <- function(df, psi.index){
-    for(i in seq_along(psi.index)){
-      df[[paste0("U", i)]] <- pmax(0, df[[vars$segmented]] - psi0[df[[vars$group]],i])
-    }
-    
-    df
-  }
-  # browser()
-  XX <- addU0var(XX, 1:n.psi)
-  vars$fixed <- c(vars$fixed, paste0("U", 1:n.psi)) # FORMULA USELESS, defaulted
-  vars$random <- c(vars$random, paste0("U", 1:n.psi)) # FORMULA 
-  plateau <- strsplit(pattern, split="")[[1]][2] == "0"
-  if(plateau){  # PLATEAU
+  
+  ## compute the U variate
+  # Here and in the rest of this function, variable(s) U are named only after
+  # the letter, but may be declined into multiple sub-columns if n.psi > 1
+  # Same approach is used ofr deriving U, V, D, G, O variables in main loop
+  XX$U <- pmax(matrix(0, ncol = n.psi, nrow = n.obs), 
+               XX[[vars$segmented]] - psi0[XX[[vars$group]],])
+  vars$fixed <- c(vars$fixed, "U")
+  vars$random <- c(vars$random, "U")
+  
+  if(plateau){
+    XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1]
     vars$fixed <- setdiff(vars$fixed, vars$segmented) # keep only plateau block
     vars$random <- setdiff(vars$fixed, vars$segmented)
   }
+  
   
   ## fit the initial lmm
   warn.list <- list()
@@ -156,81 +146,62 @@ mixed.break <- function(
   if(dev.step==-1) return(mod.init)
   mod.work <- mod.init
   
-  # HERE - weird behaviour with null variance of random effects in the initial mixed model
-  delta.i <- coef(mod.init)[[vars$group]] %>% dplyr::select(starts_with("U"))
-  XX[,paste0("delta.", 1:n.psi)] <- delta.i[XX[[vars$group]],]
-  # FINAL - U1 name - sum of fixed & random coef
+  delta.i <- coef(mod.init)[[vars$group]]
+  delta.i <- delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:n.psi))]
+  delta.i <- unname(as.matrix(delta.i))
+  # sum of fixed & random coef
   
-  # time-scale transformation for breakpoints (unconstrained)
-  break.range <- quantile(data[[vars$segmented]][!is.na(data[[vars$response]])], c(1,9)/10)
-  a1 <- unname(break.range[1])
-  a2 <- unname(break.range[2])
-  logit <- function(psi) return( log((psi-a1)/(a2-psi)) )
-  expit <- function(eta) return( (a1 + a2 * exp(eta))/(1+exp(eta)) )
+  # time-scale transformation for breakpoints
+  psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
+  logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
+  expit <- function(eta) return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
   eta.i <- logit(psi0)
-  XX <- cbind(XX, eta.i[XX[[vars$group]],])
-  names(XX)[(ncol(XX)-n.psi+1):ncol(XX)] <- paste0("eta.", 1:n.psi)
-  XX <- cbind(XX, psi0[XX[[vars$group]],])
-  names(XX)[(ncol(XX)-n.psi+1):ncol(XX)] <- paste0("psi.", 1:n.psi)
+  XX$psi <- psi0[XX[[vars$group]],] # creates multiples col if n.psi > 2
+  XX$eta <- eta.i[XX[[vars$group]],]
+  XX$delta <- delta.i[XX[[vars$group]],]
+  # browser()
   
   # FOR LOOP
   it <- 0
   logLik.diff <- tol.logLik + 1
   psi.history <- array(NA_real_, dim = c(it.max+1, n.psi, n.ind))
   psi.history[1,,] <- t(psi0)
-  
-  vars$fixed <- c(vars$fixed, paste0("G", 1:n.psi)) # FORMULA
-  vars$random <- c(vars$random, paste0("G", 1:n.psi))# FORMULA
-  # FINAL - rename G-like variables to show breakpoint index:  break.1 ?
+  vars$fixed <- c(vars$fixed, "G") 
+  vars$random <- c(vars$random, "G")
   formula.it <- as.formula(paste(
     vars$response, "~", 
     paste(vars$fixed, collapse=" + "), "+ (",
     paste(paste(vars$random, collapse=" + "), vars$group, sep = " | "), ")")
   )
-  
-  # 0. Update covariates U, G and O ====
-  # assuming we have current breakpoints in XX
-  # SLOW - FOR LOOP
-  updateUGO <- function(df, delta, plateau){
-    # browser() # HERE
-    for(n in 1:n.psi){
-      psi.n <- df[[paste0("psi.", n)]]
-      df[[paste0("U", n)]] <- pmax(0, df[[vars$segmented]] - psi.n)
-      
-      df[[paste0("V", n)]] <- (-1) * (df[[vars$segmented]] > psi.n)
-      
-      eta.n <- df[[paste0("eta.", n)]]
-      df[[paste0("D", n)]] <- (exp(eta.n) * (a2 - a1)) / (1 + exp(eta.n))^2
-      
-      df[[paste0("G", n)]] <- df[[paste0("V", n)]] * df[[paste0("D", n)]] * 
-        df[[paste0("delta.", n)]]
-      
-      df[[paste0("Off", n)]] <- (-1) * df[[paste0("G", n)]] * df[[paste0("eta.", n)]]
-    }
-    
-    # 10 / 101 plateau changes only for these patterns
-    # FINAL - adapt to any kind of pattern
-    if(plateau){
-      df$U1 <- df[[vars$segmented]] - df$U1
-      df$G1 <- -df$G1
-    }
-    
-    df$OFF <- apply(df %>% select(paste0("Off", 1:n.psi)), 1, sum)
-    
-    df
-  }
-  
   while((logLik.diff > tol.logLik | logLik.diff < 0) & it < it.max){
     it <- it + 1
     
-    # 1. Compute covariates U, G and Off ====
-    XX <- updateUGO(XX, delta.i, plateau)
+    # 1. Compute covariates U, G and O ====
+    XX$U <- pmax(matrix(0, ncol = n.psi, nrow = n.obs), XX[[vars$segmented]] - XX$psi)
+    XX$V <- -1 * (XX[[vars$segmented]] > XX$psi)
+    XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2
+    XX$G <- matrix(XX$delta * XX$V * XX$D, ncol = n.psi, nrow = n.obs)
+    
+    # mixed.break.1 code
+    # XX$U1 <- pmax(0, XX[[vars$segmented]] - psi.history[it,1,XX[[vars$group]]])
+    # XX$V1 <- -1 * (XX[[vars$segmented]] > psi.history[it,1,XX[[vars$group]]])
+    # XX$D1 <- ((exp(eta.i) * (psi.range[2] - psi.range[1])) / (1 + exp(eta.i))^2)[XX[[vars$group]]]
+    # XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1
+    
+    if(plateau) {
+      XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1]
+      XX$G[,1] <- (-1)*XX$G[,1]
+    }
+    
+    # XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1 # offset term
+    # XX[[vars$response]] <- data[[vars$response]] - XX$Off1
+    
+    XX$O <- -XX$eta * XX$G
+    XX$OFF <- rowSums(XX$O)
     XX[[vars$response]] <- data[[vars$response]] - XX$OFF
-    # browser()
     
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
-    # browser()
     tryCatch(
       mod.work <- suppressMessages(lme4::lmer(formula.it, data = XX, REML = TRUE)),
       warning = function(w){
@@ -254,42 +225,42 @@ mixed.break <- function(
     #    update breakpoint estimates
     #    extract the difference-in-slopes (fixed+random)
     # browser()
-    eta.i <- coef(mod.work)[[vars$group]][,paste0("G", 1:n.psi)]
-    if(n.psi==1) eta.i <- matrix(eta.i, nrow = n.ind)
-    XX[,paste0("eta.", 1:n.psi)] <- eta.i[XX[[vars$group]],]
+    eta.i <- coef(mod.work)[[vars$group]]
+    eta.i <- as.matrix(
+      eta.i[,colnames(eta.i) %in% paste0("G", c("", 1:n.psi))], ncol = n.psi
+    )
+    XX$eta <- eta.i[XX[[vars$group]],]
+    XX$eta <- unname(XX$eta)
+    
+    XX$psi <- expit(XX$eta)
     psi.history[it+1,,] <- t(expit(eta.i))
     
-    delta.i <- coef(mod.work)[[vars$group]][,paste0("U", 1:n.psi)]
-    if(n.psi==1) delta.i <- matrix(delta.i, nrow = n.ind)
-    XX[,paste0("delta.", 1:n.psi)] <- delta.i[XX[[vars$group]],]
+    delta.i <- coef(mod.work)[[vars$group]]
+    delta.i <- as.matrix(
+      delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:n.psi))], ncol = n.psi
+    )
+    XX$delta <- delta.i[XX[[vars$group]],]
+    XX$delta <- unname(as.matrix(XX$delta))
     
-    # browser()
   }
   # END FOR
   # print warning message at convergence if any
   if(it %in% names(warn.list)) {
-    warning("Warning at convergence during last LMM estimation: \n    ", 
-            warn.list[[it]])
+    warning("Warning at convergence during last LMM estimation: \n  ", warn.list[[it]])
   }
   # warning in case of non convergence (it.max iterations reached)
   if(it==it.max){
     warning(paste0("Maximum number of iterations allowed (`it.max` = ",it.max, 
                    ") reached: possible non-convergence. \n",
-                   "  Consider increasing `it.max` at least once,",
-                   " depending on final value of `logLik.diff`."))
+                   "  Consider increasing the value of `it.max` at least once,",
+                   " depending on value of `logLik.diff`."))
   }
   
   # At convergence, does delta*(eta-tilde(eta)) approaches 0 ?
-  # browser()
-  XX[,paste0("VD", 1:n.psi)] <- XX[,paste0("V", 1:n.psi)] * XX[,paste0("D", 1:n.psi)]
+  XX$VD <- XX$V * XX$D
   XX[[vars$response]] <- data[[vars$response]]
-  formula.check <- stringr::str_replace_all(
-    as.character(formula.it), 
-    c("G" = "VD")
-  )
-  formula.check <- as.formula(paste(
-    formula.check[2], formula.check[1], formula.check[3]
-  ))
+  formula.check <- gsub("G(\\d?)", "VD\\1", as.character(formula.it))
+  formula.check <- as.formula(paste(formula.check[2], formula.check[1], formula.check[3]))
   tryCatch(
     mod.check <- suppressMessages(
       lme4::lmer(formula.check, data = XX, REML = TRUE,
@@ -306,45 +277,43 @@ mixed.break <- function(
       stop("Error in checking LMM estimation: ", e$message)
     }
   ) 
-  # summary(mod.check) # significance of VD coefficients: VD1 yes (bad), VD2 no (good)
   
+  
+  # summary(mod.check) # look for signifiance of VD1 coefficient
+  # FINAL - adapt to multiple breakpoints
   
   # Return results ====
   # browser()
   summ <- summary(mod.work)
-  if(plateau) { # PLATEAU
-    rownames(summ$coefficients) <- stringr::str_replace_all(
-      rownames(summ$coefficients), 
-      c("U1" = paste0(vars$segmented, ".beta.1"),
-        "U" = paste0(vars$segmented, ".delta."), 
-        "G" = "logit.break.")
-    )
-    # PSILINK
+  if(plateau) { # PSILINK - both
+    rownames(summ$coefficients) <- if(n.psi==1) {
+      c(vars$segmented, "(logit.)break.") 
+    } else {
+      c(paste0(vars$segmented, c(".beta.1", paste0(".delta.", 3:(n.psi+1)))),
+        paste0("(logit.)break.", 1:n.psi)) 
+    }
+    
   } else {
-    # FORMULA - intercept or not
-    rownames(summ$coefficients)[rownames(summ$coefficients) == vars$segmented] <- 
-      paste0(vars$segmented, ".beta.1")
-    rownames(summ$coefficients) <- stringr::str_replace_all(
-      rownames(summ$coefficients), 
-      c("U" = paste0(vars$segmented, ".delta."), 
-        "G" = "logit.break.")
-    )
-    # PSILINK
+    rownames(summ$coefficients) <- if(n.psi==1) {
+      c(paste0(vars$segmented, c(".beta.1", ".delta.2")), "(logit.)break.1") 
+    } else {
+      c(paste0(vars$segmented, c(".beta.1", paste0(".delta.", 2:(n.psi+1)))),
+        paste0("(logit.)break.", 1:n.psi)) 
+    } 
   }
-  # browser()
   # removing the offset term
   mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
   z <- list(
     lme.fit = mod.work,
     fixed = summ$coefficients,
-    random = coef(mod.work)[[vars$group]], # FORMULA
-    psi.i = psi.history[it+1,,],
+    random = coef(mod.work)[[vars$group]][, 1:(1+n.psi)],
+    psi.i = t(psi.history[it+1,,]),
     fitted = mod.work@resp$mu,
     off = XX$OFF[!is.na(data[[vars$response]])],
     logLik = logLik(mod.work),
     REML = REML.work,
     psi.history = psi.history[1:(it+1),,],
-    psi.range = break.range,
+    psi.range = psi.range,
     n.iter = it,
     logLik.diff = logLik.diff,
     call = cl,
@@ -353,17 +322,6 @@ mixed.break <- function(
     warn.list = warn.list,
     lme.fit.check = mod.check
   )
-  if(n.psi > 1){
-    z$psi.i <- data.frame(
-      break. = t(psi.history[it+1,,]), 
-      order = t(diff(psi.history[it+1,,]) > 0)
-    )
-    colnames(z$psi.i) <- c(
-      paste0("break.", 1:n.psi), 
-      paste0("order.", paste0(1:(n.psi-1), 2:n.psi))
-    ) #FINAL - here is only for 2 breakpoints
-  }
-  
   if(ret.y) z$y <- XX[[vars$response]]
   
   model <- model.frame(mod.work)
@@ -372,6 +330,7 @@ mixed.break <- function(
   }
   z$model <- model
   
-  class(z) <- append(c("mixedBreak", paste0("mixedBreak", n.psi)), class(z)) 
+  class(z) <- append(paste0("mixedBreak", c("", n.psi)), class(z)) 
+  # z.it <<- append(z.it, list(z)); plot(z)
   return(z)
 }
