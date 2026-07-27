@@ -172,8 +172,7 @@ plot.mixedBreak1 <- function(
     facet_wrap(~ID) +
     xlab("Time since drug intake (minutes)") +
     ylab("SDI") + 
-    scale_y_continuous(breaks = seq(0,14,by=2), limits = c(0, NA))
-  
+    scale_y_continuous(breaks = seq(0,14,by=2), limits = c(0, 11))
   
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
@@ -187,7 +186,7 @@ plot.mixedBreak1 <- function(
     mutate(
       beta.2 = if_else(
         rep(pattern=="11", nlevels(model.plot$ID)),
-        z$random$U1 + z$random[[1]], 0
+        z$random$U + z$random[[1]], 0
       ),
       yend = psi.y + (max.time-psi)*beta.2)
 
@@ -215,8 +214,11 @@ plot.mixedBreak1 <- function(
   return(p)
 }
 
+
 ## Method for object of class 'mixedBreak2'
 ##' @export
+##' # Careful here, when pattern == "101" and breakpoints are switched,
+##' The plot has to be adapted
 plot.mixedBreak2 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
     breaks.ci = FALSE, alpha = .65
@@ -224,14 +226,14 @@ plot.mixedBreak2 <- function(
   require(ggplot2)
   require(dplyr)
   pattern <- z$pattern
-  n.psi <- ncol(z$psi.i)
+  n.psi <- dim(z$psi.history)[2]
   vars <- z$var.name
   model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))]
   names(model.plot)[names(model.plot)==vars$group] <- "ID"
   names(model.plot)[names(model.plot)==vars$response] <- "yy"
   model.plot$fitted <- z$fitted
-  model.plot[,paste("psi.", 1:n.psi)] <- z$psi.i[model.plot$ID,]
-  model.plot$psi.y <- (z$psi.i * z$random[[1]])[model.plot$ID]
+  model.plot[,paste0("psi.", 1:n.psi)] <- z$psi.i[model.plot$ID, 1:n.psi]
+  model.plot$psi.y <- (z$psi.i[[1]] * z$random[[1]])[model.plot$ID]
   
   
   p <- ggplot(model.plot, aes(x=time, y=yy)) +
@@ -239,34 +241,36 @@ plot.mixedBreak2 <- function(
     facet_wrap(~ID) +
     xlab("Time since drug intake (minutes)") +
     ylab("SDI") + 
-    scale_y_continuous(breaks = seq(0,50,by=5), limits = c(0, NA))
-  
+    scale_y_continuous(breaks = seq(-20, 50, by=5), limits = c(NA, NA)) +
+    geom_hline(yintercept = 0, lty = "dashed")
+
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
-    psi = z$psi.i,
+    psi = unname(z$psi.i[,1:n.psi]),
     psi.y.1 = z$psi.i[[1]] * z$random[[1]], # there are psi.y1 and psi.y2
-    max.time = (model.plot %>% 
-                  group_by(ID) %>% 
-                  summarise(max.time = max(time)))$max.time
+    max.time = (model.plot %>% group_by(ID) %>% 
+                  summarise(max.time = max(time)))$max.time,
+    beta.2 = if_else(
+      rep(pattern=="111", nlevels(model.plot$ID)),
+      z$random[[1]] + z$random$U1, 0
+    )
   )
   fit.data <- fit.data %>%
     mutate(
-      psi.y.2 = if_else(
-        rep(pattern=="111", nlevels(model.plot$ID)),
-        psi.y.1 + z$random$U1*(psi.2 - psi.1), psi.y.1
-      ),
-      delta.3 = z$random$U2,
-      yend = psi.y.2 + (max.time-psi.2)*delta.3
+      psi.y.2 = psi.y.1 + beta.2*(psi.2 - psi.1),
+      beta.3 = beta.2 + z$random$U2,
+      yend = psi.y.2 + beta.3*(max.time-psi.2)
     )
-  
+  # browser()
+
   if (breaks) {
     p <- p +
       annotate(GeomPoint, x = 0, y = 0, 
                colour = fit.color, shape = 18, size = 3, alpha = alpha) +
       geom_point(aes(x = psi.1, y = psi.y.1), data = fit.data,
-                 colour = fit.color, shape = 18, size = 3, alpha = alpha) +
+                 colour = fit.color, shape = 2, size = 3, alpha = alpha) + # square
       geom_point(aes(x = psi.2, y = psi.y.2), data = fit.data,
-                 colour = fit.color, shape = 18, size = 3, alpha = alpha) +
+                 colour = fit.color, shape = 0, size = 3, alpha = alpha) + # triangle?
       geom_point(aes(x = max.time, y = yend), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     
@@ -284,5 +288,5 @@ plot.mixedBreak2 <- function(
     warning("Parameter 'breaks.ci' is ignored at the moment")
   }
   
-  return(p)
+  p
 }

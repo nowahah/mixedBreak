@@ -12,8 +12,8 @@ SDI101.fit <- function(psi0 = rep(NA_real_, 2), data = NA, tol.psi = 1e-3,
   n.points <- length(x)
   n.psi <- length(psi0)
   
+  # default uniform breakpoint initialization
   if (any(is.na(psi0)) ){
-    # default uniform breakpoint initialization
     psi0[is.na(psi0)] <- seq(min(x), max(x), length.out = 2 + n.psi)[2:(1+n.psi)]
   }
   psi0 <- sort(psi0)
@@ -81,7 +81,8 @@ SDIpsilo <- SDIpsilo[SDIpsilo$type %in% c("noise","trailing") == FALSE,]
 
 
 
-# algorithm is sensible to starting points, let's give the real values for initialization first
+# algorithm is sensible to starting points, 
+# we are giving the real values (from lmbreak implementation) as initialization
 e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
                     trace = FALSE, digits = 2)
 plot(e.XPall)
@@ -98,7 +99,8 @@ for(ID in levels(SDIpsilo$id)){
     geom_point()
   tryCatch({
     break101.fit <- SDI101.fit(data = SDI.ind, 
-                               psi0 = breakpoints[as.numeric(ID), 1:2] + rnorm(2, sd = 2),
+                               psi0 = breakpoints[as.numeric(ID), 1:2] + 
+                                 rnorm(2, sd = 2),
                                model = FALSE)
     fit101.res[[as.numeric(ID)]] <- break101.fit
   }, error = function(e){
@@ -123,7 +125,7 @@ for(ID in levels(SDIpsilo$id)){
 
 # warnings for individuals 11 and 15 (again) when we keep noise and trailing
 head(fit101.res[[11]]$psi.history)
-head(fit101.res[[15]]$psi.history) # CV when noise removed
+head(fit101.res[[15]]$psi.history) # CV when noisy obs. removed
 # both due to 2-periodic oscillations after init, in range of time domain and in order
 summary(e.XPall)
 # continuity = False means at least one Vs variable has not reach 0
@@ -137,6 +139,3 @@ summary(e.XPall)
 # - look for a finer initialization than uniform (splines nadir, other...)
 # - in case of oscillation: one solution might be not practically relevant
 #   (negative or unordered breakpoints) while other could be ? heuristic
-
-# Add plot, summary, print methods (3)
-# would help simplify the analysis of results too

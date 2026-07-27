@@ -1,8 +1,8 @@
-### mixed.break2.R ---
-## * mixed.break2 (documentation)
-##' @title Mixed-Effects Models with 1 breakpoint estimate
-##' @description This function fits a mixed-effects model with a single
-##' breakpoint estimate, in the formulation described in Muggeo (2014), 
+### mixed.break.R ---
+## * mixed.break (documentation)
+##' @title Mixed-Effects Models with 1 or 2 breakpoint estimates
+##' @description This function fits a mixed-effects model with one or two
+##' breakpoint estimates, in the formulation described in Muggeo (2014), 
 ##' allowing for random effects on the breakpoint estimates.
 ##'
 ##' @param formula a two-sided linear formula object describing both the 
@@ -16,10 +16,16 @@
 ##' It must be a numeric value in the range of the segmented variable. 
 ##' Default is the middle of the observed segmented variable values 
 ##' (`mean(range(time))`).
-##' @param pattern [character "111" | "101"] One of the two following options: \itemize{
-##' \item '111' for three non-null slopes estimated ;\n",
-##' \item '101' for one non-null slope followed by a constant segment and another non
-##' -null slope
+##' @param pattern [character] One of the two following options: \itemize{
+##' \item '11' for a two-phases relationship with both slopes estimated 
+##' (assumed non-null) ;\n
+##' \item '10' for a two-phases relationship with a non-null slope followed by
+##'  a constant segment (second-phase slope is forced to 0) ;\n
+##' \item '111' for a three-phases relationship with all 3 slopes estimated 
+##' (assumed non-null) ;\n
+##' \item '101' for a three-phases relationship with one non-null slope 
+##' followed by a constant segment (second phase slope is forced to 0) and 
+##' another non-null slope.
 ##' }
 ##' @param it.max [integer>0] Maximum number of iterations allowed. Default to
 ##' 10. A warning is emitted is the maximum number of iterations is reached.
@@ -30,22 +36,25 @@
 
 
 # On purpose a very specific function to fit segmented relationship with a mixed
-# model and estimation a single breakpoint. Pattern can be "101" or "111"
+# model and estimation a single breakpoint. Pattern can be either of four 
+# options in c("11", "10", "101", "111").
 
-## * mixed.break2
+## * mixed.break
 ##' @export
-mixed.break2 <- function(
-    formula, data, psi0 = NA, tol.logLik = 1e-4, it.max = 10L, pattern = "111",
+mixed.break <- function(
+    formula, data, pattern, psi0 = NA, tol.logLik = 1e-4, it.max = 10L, 
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
-  # if(!(pattern %in% c("111", "101")))
-  #   stop(paste(
-  #     "'pattern' should either be: \n",
-  #     "-'111' for three non-null slopes estimated (unconstrained 3 segments) ;\n",
-  #     "-'101' for one non-null slope followed by a constant segment,",
-  #     "then another non-null segment"
-  #   ))
+  if(!(pattern %in% c("11", "10", "101", "111"))){
+    stop(paste(
+      "Argument 'pattern' should be one of c(\"11\", \"10\", \"101\", \"111\") \n"
+      # "-'111' for three non-null slopes estimated (unconstrained 3 segments) ;\n",
+      # "-'101' for one non-null slope followed by a constant segment,",
+      # "then another non-null segment"
+    ))
+  }
   require(dplyr)
+  browser()
   
   # Input handling ====
   ret.x <- x
@@ -66,12 +75,6 @@ mixed.break2 <- function(
   vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]] 
   # one single grouping variable assumed
   
-  # stopifnot(exprs = {
-  #   is.logical(ret.x),
-  #   is.logical(ret.y),
-  #   rlang::is_formula(formula),
-  # })
-  
   # model frame
   XX <- data.frame(
     y = data[[vars$response]],
@@ -83,7 +86,7 @@ mixed.break2 <- function(
   names(XX)[names(XX)=="ID"] <- vars$group
   n.ind <- nlevels(XX[[vars$group]])
   n.psi <- nchar(pattern) - 1L
-  
+
   # 0. Initialization ====
   
   ## Fix a starting value for the change points
@@ -116,19 +119,21 @@ mixed.break2 <- function(
   ## compute the U variables
   addU0var <- function(df, psi.index){
     for(i in seq_along(psi.index)){
-      df[[paste0("U", i)]] <- pmax(0, df[[vars$segmented]] - psi0[,i])
+      df[[paste0("U", i)]] <- pmax(0, df[[vars$segmented]] - psi0[df[[vars$group]],i])
     }
     
     df
   }
+  # browser()
   XX <- addU0var(XX, 1:n.psi)
   vars$fixed <- c(vars$fixed, paste0("U", 1:n.psi)) # FORMULA USELESS, defaulted
   vars$random <- c(vars$random, paste0("U", 1:n.psi)) # FORMULA 
-  if(pattern %in% c("10", "101")){  # PLATEAU
+  plateau <- strsplit(pattern, split="")[[1]][2] == "0"
+  if(plateau){  # PLATEAU
     vars$fixed <- setdiff(vars$fixed, vars$segmented) # keep only plateau block
     vars$random <- setdiff(vars$fixed, vars$segmented)
   }
-
+  
   ## fit the initial lmm
   warn.list <- list()
   formula.init <- as.formula(paste(
@@ -150,7 +155,8 @@ mixed.break2 <- function(
   )
   if(dev.step==-1) return(mod.init)
   mod.work <- mod.init
-
+  
+  # HERE - weird behaviour with null variance of random effects in the initial mixed model
   delta.i <- coef(mod.init)[[vars$group]] %>% dplyr::select(starts_with("U"))
   XX[,paste0("delta.", 1:n.psi)] <- delta.i[XX[[vars$group]],]
   # FINAL - U1 name - sum of fixed & random coef
@@ -159,12 +165,6 @@ mixed.break2 <- function(
   break.range <- quantile(data[[vars$segmented]][!is.na(data[[vars$response]])], c(1,9)/10)
   a1 <- unname(break.range[1])
   a2 <- unname(break.range[2])
-  # a1 <- min(XX[[vars$segmented]])
-  # a2 <- (XX[!is.na(XX[[vars$response]]), 
-  #           c(vars$segmented, vars$response, vars$group)] %>%
-  #   group_by(id) %>%
-  #   summarise(a2 = max(time)) %>%
-  #   summarise(a2 = mean(a2)))$a2
   logit <- function(psi) return( log((psi-a1)/(a2-psi)) )
   expit <- function(eta) return( (a1 + a2 * exp(eta))/(1+exp(eta)) )
   eta.i <- logit(psi0)
@@ -172,7 +172,7 @@ mixed.break2 <- function(
   names(XX)[(ncol(XX)-n.psi+1):ncol(XX)] <- paste0("eta.", 1:n.psi)
   XX <- cbind(XX, psi0[XX[[vars$group]],])
   names(XX)[(ncol(XX)-n.psi+1):ncol(XX)] <- paste0("psi.", 1:n.psi)
-
+  
   # FOR LOOP
   it <- 0
   logLik.diff <- tol.logLik + 1
@@ -191,7 +191,7 @@ mixed.break2 <- function(
   # 0. Update covariates U, G and O ====
   # assuming we have current breakpoints in XX
   # SLOW - FOR LOOP
-  updateUGO <- function(df, delta, pattern){
+  updateUGO <- function(df, delta, plateau){
     # browser() # HERE
     for(n in 1:n.psi){
       psi.n <- df[[paste0("psi.", n)]]
@@ -205,12 +205,12 @@ mixed.break2 <- function(
       df[[paste0("G", n)]] <- df[[paste0("V", n)]] * df[[paste0("D", n)]] * 
         df[[paste0("delta.", n)]]
       
-      df[[paste0("Off", n)]] <- -1 * df[[paste0("G", n)]] * df[[paste0("eta.", n)]]
+      df[[paste0("Off", n)]] <- (-1) * df[[paste0("G", n)]] * df[[paste0("eta.", n)]]
     }
     
     # 10 / 101 plateau changes only for these patterns
     # FINAL - adapt to any kind of pattern
-    if(pattern %in% c("10", "101")){
+    if(plateau){
       df$U1 <- df[[vars$segmented]] - df$U1
       df$G1 <- -df$G1
     }
@@ -222,12 +222,12 @@ mixed.break2 <- function(
   
   while((logLik.diff > tol.logLik | logLik.diff < 0) & it < it.max){
     it <- it + 1
-
+    
     # 1. Compute covariates U, G and Off ====
-    XX <- updateUGO(XX, delta.i, pattern)
+    XX <- updateUGO(XX, delta.i, plateau)
     XX[[vars$response]] <- data[[vars$response]] - XX$OFF
     # browser()
-
+    
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
     # browser()
@@ -255,10 +255,12 @@ mixed.break2 <- function(
     #    extract the difference-in-slopes (fixed+random)
     # browser()
     eta.i <- coef(mod.work)[[vars$group]][,paste0("G", 1:n.psi)]
+    if(n.psi==1) eta.i <- matrix(eta.i, nrow = n.ind)
     XX[,paste0("eta.", 1:n.psi)] <- eta.i[XX[[vars$group]],]
     psi.history[it+1,,] <- t(expit(eta.i))
     
     delta.i <- coef(mod.work)[[vars$group]][,paste0("U", 1:n.psi)]
+    if(n.psi==1) delta.i <- matrix(delta.i, nrow = n.ind)
     XX[,paste0("delta.", 1:n.psi)] <- delta.i[XX[[vars$group]],]
     
     # browser()
@@ -278,13 +280,12 @@ mixed.break2 <- function(
   }
   
   # At convergence, does delta*(eta-tilde(eta)) approaches 0 ?
+  # browser()
   XX[,paste0("VD", 1:n.psi)] <- XX[,paste0("V", 1:n.psi)] * XX[,paste0("D", 1:n.psi)]
   XX[[vars$response]] <- data[[vars$response]]
   formula.check <- stringr::str_replace_all(
     as.character(formula.it), 
     c("G" = "VD")
-    # c(pattern3 = paste0("G", 1:n.psi)), 
-    # paste0("VD", 1:n.psi)
   )
   formula.check <- as.formula(paste(
     formula.check[2], formula.check[1], formula.check[3]
@@ -309,8 +310,9 @@ mixed.break2 <- function(
   
   
   # Return results ====
+  # browser()
   summ <- summary(mod.work)
-  if(pattern=="101") { # PLATEAU
+  if(plateau) { # PLATEAU
     rownames(summ$coefficients) <- stringr::str_replace_all(
       rownames(summ$coefficients), 
       c("U1" = paste0(vars$segmented, ".beta.1"),
@@ -320,7 +322,8 @@ mixed.break2 <- function(
     # PSILINK
   } else {
     # FORMULA - intercept or not
-    rownames(summ$coefficients)[1] <- paste0(vars$segmented, ".beta.1")
+    rownames(summ$coefficients)[rownames(summ$coefficients) == vars$segmented] <- 
+      paste0(vars$segmented, ".beta.1")
     rownames(summ$coefficients) <- stringr::str_replace_all(
       rownames(summ$coefficients), 
       c("U" = paste0(vars$segmented, ".delta."), 
@@ -328,18 +331,20 @@ mixed.break2 <- function(
     )
     # PSILINK
   }
+  # browser()
   # removing the offset term
   mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
   z <- list(
     lme.fit = mod.work,
     fixed = summ$coefficients,
     random = coef(mod.work)[[vars$group]], # FORMULA
-    psi.i = t(psi.history[it+1,,]),
+    psi.i = psi.history[it+1,,],
     fitted = mod.work@resp$mu,
     off = XX$OFF[!is.na(data[[vars$response]])],
     logLik = logLik(mod.work),
     REML = REML.work,
     psi.history = psi.history[1:(it+1),,],
+    psi.range = break.range,
     n.iter = it,
     logLik.diff = logLik.diff,
     call = cl,
@@ -348,22 +353,25 @@ mixed.break2 <- function(
     warn.list = warn.list,
     lme.fit.check = mod.check
   )
-  z$psi.i <- data.frame(
-    break. = z$psi.i, 
-    order = t(diff(t(z$psi.i)) > 0)
-  )
-  colnames(z$psi.i) <- c(
-    paste0("break.", 1:n.psi), 
-    paste0("order.", paste0(1:(n.psi-1), 2:n.psi))
-  ) #FINAL - here is only for 2 breakpoints
+  if(n.psi > 1){
+    z$psi.i <- data.frame(
+      break. = t(psi.history[it+1,,]), 
+      order = t(diff(psi.history[it+1,,]) > 0)
+    )
+    colnames(z$psi.i) <- c(
+      paste0("break.", 1:n.psi), 
+      paste0("order.", paste0(1:(n.psi-1), 2:n.psi))
+    ) #FINAL - here is only for 2 breakpoints
+  }
+  
   if(ret.y) z$y <- XX[[vars$response]]
   
   model <- model.frame(mod.work)
-  if(pattern=="101"){
+  if(plateau){
     model[[vars$segmented]] <- data[[vars$segmented]][!is.na(data[[vars$response]])]
   }
   z$model <- model
   
-  class(z) <- append(c("mixedBreak", "mixedBreak2"), class(z)) 
+  class(z) <- append(c("mixedBreak", paste0("mixedBreak", n.psi)), class(z)) 
   return(z)
 }

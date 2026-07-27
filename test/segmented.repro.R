@@ -6,12 +6,12 @@ data10 <- SDIpsilo[SDIpsilo$time < 190,]
 
 # Model estimation ====
 library(segmented)
-library(lme4)
+# library(lme4)
 
 psi0 <- mean(range(data10$time))
-data10$U <- pmax(0, data10$time - psi0)
+data10$U0 <- pmax(0, data10$time - psi0)
 pre.fit <- lme(
-  score ~ 0 + time + U , 
+  score ~ 0 + time + U0 , 
   data = data10,
   random = ~time|id,
   na.action = na.omit
@@ -21,8 +21,10 @@ segmented.fit <- segmented.lme(
   random = list(id = pdDiag(~ time + U + G0 - 1)),
   psi.link = "logit"
 )
-segmented.fit$psi.i
 plot(segmented.fit, vline = TRUE)
+
+range(segmented.fit$psi.i) ## 54.92810 95.67344
+plot(segmented.fit, vline = TRUE, xlim = c(0,75)) ## All breakpoints around between 60-75
 
 # Here the displayed individuals breakpoint values are close to identical
 # whereas in the actual estimation psi.i, they are much more spread out.

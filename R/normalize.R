@@ -55,3 +55,26 @@ normalize.mlmbreak <- function(x){
   
   return(res)
 }
+
+
+## method for object of class 'mixedBreak'
+normalize.mixedBreak <- function(x){
+  summ <- summary(x$lme.fit)
+  n.coef <- length(x$lme.fit@beta)
+  a <- x$range.psi
+  expit <- function(bp) { return((a[1]+a[2]*exp(bp)) / (1+exp(bp))) }
+  res <- list(
+    break.x1.avg = expit(x$lme.fit@beta[length(x$lme.fit@beta)]),
+    break.x1.ind = x$psi.i,
+    break.x1.sd = summary(x$lme.fit)$coefficients[n.coef, "Std. Error"],
+    break.x1.random.sd = unname(attr(lme4::VarCorr(x$lme.fit)$ID, "stddev")['G1']),
+    break.CI95.low = expit(confint(x)[1, n.coef]),
+    break.CI95.up = expit(confint(x)[2, n.coef]),
+    break.y1.ind = x$psi.i * x$random[[1]], 
+    slope2 = ifelse(x$pattern == "11", sum(x$fixed[1:2, 1]), 0),
+    slope2.sd = ifelse(x$pattern == "11", sum(x$fixed[1:2, 2])+ 2*summ$varcor$ID[1,2], NA)
+    # break.intercept = intercept.rd + time*break.x.rd
+  )
+  
+  return(res)
+}

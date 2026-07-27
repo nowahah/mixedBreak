@@ -377,11 +377,12 @@ ggplot(dataset1 %>% filter(str_detect(scenarLabel, "REF")), aes(x = break.avg, y
   geom_boxplot() +
   geom_density(aes(x = break.avg), inherit.aes = FALSE) +
   geom_vline(xintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
-  labs(subtitle = TeX(paste("True mean \\psi = 77 ; Mean of estimates \\bar{\\hat{\\psi}}=",
-                            round(mean(dataset1$break.avg[str_detect(scenarLabel, "REF")],
-                                       na.rm=T),1), "; Median(\\hat{\\psi}) =",
-                            round(median(dataset1$break.avg[str_detect(scenarLabel,"REF")],
-                                                   na.rm=T),1)))) +
+  labs(subtitle = TeX(paste(
+    "True mean \\psi = 77 ; Mean of estimates \\bar{\\hat{\\psi}}=",
+    round(mean(dataset1$break.avg[str_detect(dataset1$scenarLabel, "REF")],
+               na.rm=T),1), "; Median(\\hat{\\psi}) =",
+    round(median(dataset1$break.avg[dataset1$str_detect(scenarLabel,"REF")],
+                 na.rm=T),1)))) +
   xlab("Estimated breakpoint distribution (min)") +
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
