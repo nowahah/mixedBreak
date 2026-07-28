@@ -225,6 +225,16 @@ plot.mixedBreak2 <- function(
 ) {
   require(ggplot2)
   require(dplyr)
+  
+  if(any(diff(t(z$psi.i)) < 0)) {
+    ind.switched <- which(diff(t(z$psi.i)) < 0)
+    warning(paste(
+      "Some individuals have switched estimated breakpoints:\n  ",
+      z$var.name$group, "= {", paste(ind.switched, collapse = ", "), "}\n  ",
+      "Graph is incorrect for these groups."
+    ))
+  }
+  
   pattern <- z$pattern
   n.psi <- dim(z$psi.history)[2]
   vars <- z$var.name
@@ -243,7 +253,7 @@ plot.mixedBreak2 <- function(
     ylab("SDI") + 
     scale_y_continuous(breaks = seq(-20, 50, by=5), limits = c(NA, NA)) +
     geom_hline(yintercept = 0, lty = "dashed")
-
+  
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
     psi = unname(z$psi.i[,1:n.psi]),

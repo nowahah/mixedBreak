@@ -42,21 +42,34 @@
 ## * mixed.break
 ##' @export
 mixed.break <- function(
-    formula, data, pattern = NA, psi0 = NA, psi.range = NULL,
-    tol.logLik = 1e-4, it.max = 10L, 
+    formula, data, pattern = NA, psi0 = NA, psi.range = NA,
+    tol.logLik = 1e-4, it.max = 10L, approx = "Muggeo.LMM",
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
+  # Input checking ===
   if(!(pattern %in% c("11", "10", "111", "101")))
     stop(paste(
       "'pattern' should either be one of four options:",
-      "c(\"11\", \"10\", \"111\", \"101\").\n  See documentation for signification."))
+      "c('11', '10', '111', '101').\n  See documentation for signification."))
   
-  if(!is.null(psi.range) & !any(c("q.prob", "value") %in% names(psi.range)))
+  n.psi <- nchar(pattern) - 1L
+  if( (length(psi.range) != n.psi & !all(is.na(psi.range))) | 
+      (any(is.na(psi.range)) & length(psi.range) > 1L) ) {
     stop(paste(
-      "When specified, `psi.range` must have at least one of:",
-      "c(\"q.prob\", \"value\") as name."
-    ))
-  # Input handling ====
+      "When specified, `psi.range` must be (non-NA) numeric and same size as number of",
+      "breakpoints (", n.psi, ").")
+      )
+  }
+  
+  if(!(approx %in% c("Muggeo.LMM", "Muggeo.LM", "Muggeo.less")))
+    stop(paste(
+      "'approx' should either be one of three options:",
+      "c('Muggeo.LMM', 'Muggeo.LM', 'Muggeo.less').\n",
+      "  See documentation for signification (CURRENTLY UNUSED)."))
+  
+  
+  
+  # Formula splitting ====
   ret.x <- x
   ret.y <- y
   ret.psi <- psi.history
@@ -76,7 +89,6 @@ mixed.break <- function(
   # one single grouping variable assumed
   
   # model frame
-  # browser()
   XX <- data.frame(
     y = data[[vars$response]],
     time = data[[vars$segmented]],
@@ -89,15 +101,47 @@ mixed.break <- function(
   n.psi <- nchar(pattern) - 1L
   n.obs <- nrow(XX)
   plateau <- (substr(pattern, 2L, 2L) == "0")
-
+  
+  
   # 0. Initialization ====
   
-  ## Fix a starting value for the change points
+  ## Psi range (breakpoints) ====
+  if(all(is.na(psi.range)) & length(psi.range) == 1L){
+    # default 5-95% quantile of segmented variable
+    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
+  }
+  
+  logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
+  expit <- function(eta) return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
+  
+  ## Fix a starting value for the change points ====
+  ### mlmbreak initialization ====
+  if(!is.na(psi0) & psi0 == "lmbreak"){
+    
+    formula.lmbreak <- formula(paste0(
+      vars$response, "~", "bp(", vars$segmented, ", '", pattern, "')"
+    ))
+    if(!attr(terms(formula), "intercept")) {
+      formula.lmbreak <- update.formula(formula.lmbreak, ~ . + 0)
+    }
+    lmbreak.fit <- lmbreak::mlmbreak(
+      formula.lmbreak,
+      data = data,
+      cluster = vars$group,
+      trace = 0,
+      control = lmbreak::lmbreak.options(n.iter = it.max)
+    )
+    
+    tbl <- model.tables(lmbreak.fit)
+    breakpoints <- tbl[rep((1:n.ind-1)*(2+n.psi), each=n.psi)+(2:(n.psi+1)), 1:2]
+    psi0 <- matrix(breakpoints[,2], ncol = n.psi, byrow = TRUE)
+  }
+  
   psi0.ok <- TRUE
   # should be numeric in the range of segmented variable (time)
   if (!is.numeric(psi0) | 
-      any(min(XX[[vars$segmented]]) > psi0) | 
-      any(max(XX[[vars$segmented]]) < psi0)) {
+      any(psi.range[1] > psi0) | 
+      any(psi.range[2] < psi0)) {
     psi0.ok <- FALSE
   } else if ( !(length(psi0) %in% c(n.psi ,n.ind, n.psi*n.ind))) {
     warning(sprintf(
@@ -107,19 +151,24 @@ mixed.break <- function(
     psi0.ok <- FALSE
   }
   
-  # uniform initialization for psi0
+  ### default uniform initialization for psi0 ====
+  # in the allowed range for breakpoints `psi.range`
   if(!psi0.ok){
-    psi0 <- unname(quantile(XX[[vars$segmented]], probs = 1:n.psi/(n.psi+1)))
+    seg.var <- XX[[vars$segmented]]
+    psi0 <- unname(quantile(
+      seg.var[psi.range[1] < seg.var &  seg.var < psi.range[2]], 
+      probs = 1:n.psi/(n.psi+1)
+    ))
     message(paste0(
-      "psi0 incorrectly (not numeric / out of range of `", vars$segmented,
-      "`) or not specified: \n  Using uniform initialization for all ",
+      "psi0 incorrectly (not numeric / out of range of breakpoint range",
+      ", or not specified): \n  Using uniform initialization for all ",
       "individuals: psi0 = c(", paste0(format(psi0, digit=1), collapse = ", "), ")"
     ))
   }
   if (length(psi0)==n.psi) psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T)
   
   
-  ## compute the U variate
+  ## Compute the U variate ====
   # Here and in the rest of this function, variable(s) U are named only after
   # the letter, but may be declined into multiple sub-columns if n.psi > 1
   # Same approach is used ofr deriving U, V, D, G, O variables in main loop
@@ -135,7 +184,7 @@ mixed.break <- function(
   }
   
   
-  ## fit the initial lmm
+  ## Fit the initial lmm ====
   warn.list <- list()
   formula.init <- as.formula(paste(
     vars$response, "~", 
@@ -162,39 +211,13 @@ mixed.break <- function(
   delta.i <- unname(as.matrix(delta.i))
   # sum of fixed & random coef
   
-  # time-scale transformation for breakpoints
-  # browser()
-  if(is.null(psi.range)){
-    # default 10-90%
-    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
-  } else if ("q.prob" %in% names(psi.range)) {
-    psi.range <- unname(quantile(XX[[vars$segmented]], probs = psi.range[["q.prob"]]))
-  } else if ("value" %in% names(psi.range)) {
-    psi.range <- psi.range[["value"]]
-    stopifnot( length(psi.range)==2 & is.numeric(psi.range) )
-    if(psi.range[1] < min(XX[[vars$segmented]]) | 
-       psi.range[2] > max(XX[[vars$segmented]])){
-      
-      psi.range[1] <- max(psi.range[1], min(XX[[vars$segmented]]))
-      psi.range[2] <- min(psi.range[2], max(XX[[vars$segmented]]))
-      
-      message(sprintf(paste(
-        "`psi.range` specifies values out of observed segmented variable `%s` range.\n",
-        "  Projecting `psi.range` onto observed range: `psi.range` = c(%s)"
-        ), vars$segmented, paste(psi.range, collapse = ", "))
-      )
-    }
-  }
-  
-  logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
-  expit <- function(eta) return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
   eta.i <- logit(psi0)
   XX$psi <- psi0[XX[[vars$group]],] # creates multiples col if n.psi > 2
   XX$eta <- eta.i[XX[[vars$group]],]
   XX$delta <- delta.i[XX[[vars$group]],]
   # browser()
   
-  # FOR LOOP
+  ## FOR loop setup ====
   it <- 0
   logLik.diff <- tol.logLik + 1
   psi.history <- array(NA_real_, dim = c(it.max+1, n.psi, n.ind))
@@ -212,7 +235,8 @@ mixed.break <- function(
     # 1. Compute covariates U, G and O ====
     XX$U <- pmax(matrix(0, ncol = n.psi, nrow = n.obs), XX[[vars$segmented]] - XX$psi)
     XX$V <- -1 * (XX[[vars$segmented]] > XX$psi)
-    XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2
+    XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2 # SCALES
+    XX$VD <- XX$V * XX$D
     XX$G <- matrix(XX$delta * XX$V * XX$D, ncol = n.psi, nrow = n.obs)
     
     # mixed.break.1 code
@@ -229,9 +253,14 @@ mixed.break <- function(
     # XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1 # offset term
     # XX[[vars$response]] <- data[[vars$response]] - XX$Off1
     
-    XX$O <- -XX$eta * XX$G
-    XX$OFF <- rowSums(XX$O)
-    XX[[vars$response]] <- data[[vars$response]] - XX$OFF
+    if(approx == "Muggeo.LMM") {
+      XX$O <- -XX$eta * XX$G
+      XX$OFF <- rowSums(XX$O)
+      XX[[vars$response]] <- data[[vars$response]] - XX$OFF
+    } else if(approx == "Muggeo.less") { 
+      XX$U <- XX$U - XX$eta * XX$VD 
+    }
+    
     
     # 2. Fit the working LMM ====
     mod.work.prev <- mod.work
@@ -262,9 +291,8 @@ mixed.break <- function(
     eta.i <- as.matrix(
       eta.i[,colnames(eta.i) %in% paste0("G", c("", 1:n.psi))], ncol = n.psi
     )
-    XX$eta <- eta.i[XX[[vars$group]],]
-    XX$eta <- unname(XX$eta)
     
+    XX$eta <- unname(eta.i[XX[[vars$group]],])
     XX$psi <- expit(XX$eta)
     psi.history[it+1,,] <- t(expit(eta.i))
     
@@ -276,7 +304,7 @@ mixed.break <- function(
     XX$delta <- unname(as.matrix(XX$delta))
     
   }
-  # END FOR
+  ## END FOR
   # print warning message at convergence if any
   if(it %in% names(warn.list)) {
     warning("Warning at convergence during last LMM estimation: \n  ", warn.list[[it]])
@@ -290,9 +318,11 @@ mixed.break <- function(
   }
   
   # At convergence, does delta*(eta-tilde(eta)) approaches 0 ?
-  XX$VD <- XX$V * XX$D
   XX[[vars$response]] <- data[[vars$response]]
   formula.check <- gsub("G(\\d?)", "VD\\1", as.character(formula.it))
+  if(approx=="Muggeo.less"){
+    formula.check <- gsub("W(\\d?)", "U\\1", formula.check)
+  }
   formula.check <- as.formula(paste(formula.check[2], formula.check[1], formula.check[3]))
   tryCatch(
     mod.check <- suppressMessages(
@@ -336,7 +366,7 @@ mixed.break <- function(
   z <- list(
     lme.fit = mod.work,
     fixed = summ$coefficients,
-    random = coef(mod.work)[[vars$group]][, 1:(1+n.psi)],
+    random = coef(mod.work)[[vars$group]][, 1:(2*n.psi)],
     psi.i = t(psi.history[it+1,,]),
     fitted = mod.work@resp$mu,
     off = XX$OFF[!is.na(data[[vars$response]])],
@@ -349,6 +379,7 @@ mixed.break <- function(
     call = cl,
     var.name = vars,
     pattern = pattern,
+    approx = approx,
     warn.list = warn.list,
     lme.fit.check = mod.check
   )

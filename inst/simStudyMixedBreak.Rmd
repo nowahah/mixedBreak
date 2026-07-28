@@ -206,7 +206,7 @@ The first reported outcome are missing estimates counts and rates. We made a pri
 
 ## Missing estimates rates per scenario
 
-Every datasets produced resulted in a successful estimation of the regression coefficients. No missing estimates were produced.
+No missing estimates were produced.
 
 ```{r err-rate-scenar, echo=TRUE}
 all(is.na(estimates.11$error)) & all(is.na(estimates.10$error))
@@ -429,7 +429,7 @@ ggplot(dataset2.dgm, aes(x = break.x1.avg.x, y = break.x1.avg.y)) +
 dataset2.dgm %>% select(scenarLabel, rho) %>% distinct() %>% arrange(desc(rho))
 ```
 
-This panel exhibits homogeneous between-method correlations among the different DGM, the lowest being 0.81 for the scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.95 for the one with the longest plateau duration $T_{peak}=143$ minutes. In both cases these min and max correlation scenarios were the same than for the comparison between Unconstrained model VS Plateau model.
+This panel exhibits homogeneous between-method correlations among the different DGM, the lowest being 0.81 for the scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.95 for the one with the longest plateau duration $T_{peak}=143$ minutes. In both cases these min and max correlation scenarios were the same than for the comparison between Unconstrained linear mixed model VS Plateau linear model of the previous simulation study (package `segmented`).
 
 Overall, the correlation in the breakpoint estimate between the two methods is high, reflecting agreement between the estimates of both methods.
 Additionally, we plot below the same graph between the unconstrained model and the same model in another implementation (package `segmented`, function `segmented.lme`):
@@ -459,7 +459,7 @@ dataset2.dgm %>%
   arrange(desc(rho.muggeo))
 ```
 
-The correlation is very low for two methods who are supposed to rely on the same theoretical algorithm. The range is $[53\%-83\%]$ across DGM. It also appears dependent on the DGM, which highlights differences in both methods.
+The correlation is very low for two methods who are supposed to rely on the same theoretical algorithm. The range is $[53\%-83\%]$ across DGM. It also appears dependent on the DGM, which highlights intrinsic differences between the methods.
 
 
 
@@ -469,10 +469,11 @@ The correlation is very low for two methods who are supposed to rely on the same
 A zip plot is a plot of confidence intervals (CI) fractionally ranked by $|z_d|$, with $z_d := \frac{(\hat{\psi_d} - \psi)}{\sigma_{\psi}}$.
 The color blue is used when the CI covered the true value (which is 77) while the color red is used when it did not. The yellow dashed lines represents the confidence interval on the coverage probability estimate.
 The zip plot is a mean of understanding potential issues with coverage.
-Under or over coverage typically arises in one of two situations:
+Under or over coverage typically arises in one of three situations:
 
 1. Bias in the breakpoint estimate $\hat\psi_d$ ;
 1. Mis-estimated empirical SE $\hat s_{\hat\psi_d}$ of breakpoint estimate. Exempt of bias, underestimating this quantity leads to undercoverage, and overestimating it leads to overcoverage.
+1. Estimates distribution assumption is not met. Here we saw on the empirical distribution that normality appears reasonable, so we can reasonably exclude this ingredient for explaining potential issues.
 
 
 ### Unconstrained model
@@ -775,11 +776,11 @@ Below are listed the different **effects of simulation parameters** on the perfo
 # Discussion
 
 
-Again, the results of this simulation study might appear quite surprising in the light of previous knowledge brought by Muggeo [@muggeo_estimating_2003; @muggeo_segmented_2014]. It is however mentioned that the described algorithm "always will converge in situations with low variance, provided that the break-point exists". Since the methods have not previously been stretched to the point where they do not work effectively, this could be a plausible explanation of why they don't yield accurate estimates. This being the second simulation study on these algorithm, it questions the actual effectiveness of such methods.
+Again, the results of this simulation study might appear quite surprising in the light of previous knowledge brought by Muggeo [@muggeo_estimating_2003; @muggeo_segmented_2014]. It is however mentioned that the described algorithm "always will converge in situations with low variance, provided that the break-point exists". Since the methods have not previously been stretched to the point where they do not work effectively, this could be a plausible explanation of why they don't yield accurate estimates. 
 
-Even the properly specified model is always biased across reasonably designed Data-Generating Mechanism (DGM), and performs worse than the miss-specified unconstrained model. Both methods yields highly correlated breakpoint estimates (they are derived from the same estimation algorithm, and the same implementation). This appears surprising given that almost all second-phase slope are estimated to be non significantly different from 0. removing this degree of freedom from the model results in more bias in the breakpoint estimate, but a lower estimates dispersion.
+Even the properly specified model is always biased across reasonably designed Data-Generating Mechanism (DGM), and performs worse than the miss-specified unconstrained mixed model. This appears surprising given that almost all second-phase slope are estimated to be non significantly different from 0. removing this degree of freedom from the model results in more bias in the breakpoint estimate, but a lower estimates dispersion. Both methods yield highly correlated breakpoint estimates (they are derived from the same estimation algorithm, and the same implementation).
 
-Coverage was initially reported as a little under the nominal level of 95% for the mixed models (being as low as 90%), though it differs slightly from the Monte Carlo estimate (as low as 79%), and is unsatisfactory. The breakpoint SE is currently underestimated, as reported by Muggeo. As he suggested a bootstrap approach appears more appropriate for modelling this quantity.
+Coverage was initially reported as a little under the nominal level of 95% for the mixed models (being as low as 90%), though it differs slightly from the Monte Carlo estimate (as low as 79%), and is unsatisfactory. The breakpoint SE is currently underestimated, as reported by Muggeo. As he suggested a bootstrap approach appears more appropriate for modelling this quantity. The estimation procedure can be questioned for its effectiveness.
 
 Bias differs substantially from the one reported in the original articles. The structure of the data with the plateau in the second phase is cleared from affecting the model's performance, since the mixed model with the plateau performs worse that the unconstrained and miss-specified model.
 
