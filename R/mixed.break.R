@@ -43,7 +43,7 @@
 ##' @export
 mixed.break <- function(
     formula, data, pattern = NA, psi0 = NA, psi.range = NA,
-    tol.logLik = 1e-4, it.max = 10L, approx = "Muggeo.LMM",
+    tol.logLik = 1e-4, it.max = 20L, approx = "Muggeo.LMM",
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
   # Input checking ===
@@ -51,6 +51,8 @@ mixed.break <- function(
     stop(paste(
       "'pattern' should either be one of four options:",
       "c('11', '10', '111', '101').\n  See documentation for signification."))
+  # FINAL - could be manageable to add new breakpoint
+  # just have to be careful with breakpoint order when plotting
   
   n.psi <- nchar(pattern) - 1L
   if( (length(psi.range) != n.psi & !all(is.na(psi.range))) | 
@@ -66,8 +68,6 @@ mixed.break <- function(
       "'approx' should either be one of three options:",
       "c('Muggeo.LMM', 'Muggeo.LM', 'Muggeo.less').\n",
       "  See documentation for signification (CURRENTLY UNUSED)."))
-  
-  
   
   # Formula splitting ====
   ret.x <- x
@@ -88,12 +88,21 @@ mixed.break <- function(
   vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]] 
   # one single grouping variable assumed
   
+  if(!all(setdiff(unique(unlist(vars)), c("1", "0", "-1")) %in% names(data))) {
+    var.miss <- setdiff(unique(unlist(vars)), c("1", "0", "-1", names(data)))
+    stop(paste(
+      "Invalid formula. Some variable(s) {",
+      paste(var.miss, collapse = ", "),
+      "} are not present in `data`."))
+  }
+  
   # model frame
+  group.key <- as.factor(as.character(data[[vars$group]]))
   XX <- data.frame(
     y = data[[vars$response]],
     time = data[[vars$segmented]],
     data[,setdiff(union(vars$fixed, vars$random), c("0", "-1", vars$segmented))],
-    ID = as.factor(data[[vars$group]])
+    ID = as.factor(as.numeric(group.key))
   )
   names(XX)[1] <- vars$response
   names(XX)[names(XX)=="ID"] <- vars$group
@@ -107,7 +116,7 @@ mixed.break <- function(
   
   ## Psi range (breakpoints) ====
   if(all(is.na(psi.range)) & length(psi.range) == 1L){
-    # default 5-95% quantile of segmented variable
+    # default 10-90% quantile of segmented variable
     psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
   }
   
@@ -246,6 +255,7 @@ mixed.break <- function(
     # XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1
     
     if(plateau) {
+      # change sign of V before instead: factorizes code later for "Muggeo.less"
       XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1]
       XX$G[,1] <- (-1)*XX$G[,1]
     }
@@ -258,7 +268,13 @@ mixed.break <- function(
       XX$OFF <- rowSums(XX$O)
       XX[[vars$response]] <- data[[vars$response]] - XX$OFF
     } else if(approx == "Muggeo.less") { 
-      XX$U <- XX$U - XX$eta * XX$VD 
+      if(plateau){
+        XX$U <- XX$U + XX$eta * XX$VD 
+      } else if(!plateau) {
+        XX$U <- XX$U - XX$eta * XX$VD 
+        # TODO - not for both only for the first column ??
+      }
+      
     }
     
     
@@ -363,11 +379,17 @@ mixed.break <- function(
   }
   # removing the offset term
   mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
+  psi.i <- if(n.psi == 1) 
+    as.matrix(psi.history[it+1,,])
+  else
+    t(psi.history[it+1,,])
+  rownames(psi.i) <- levels(group.key)
+  # colnames(psi.i) <- paste0("break.", 1:n.psi)
   z <- list(
     lme.fit = mod.work,
     fixed = summ$coefficients,
     random = coef(mod.work)[[vars$group]][, 1:(2*n.psi)],
-    psi.i = t(psi.history[it+1,,]),
+    psi.i = psi.i,
     fitted = mod.work@resp$mu,
     off = XX$OFF[!is.na(data[[vars$response]])],
     logLik = logLik(mod.work),
@@ -386,9 +408,11 @@ mixed.break <- function(
   if(ret.y) z$y <- XX[[vars$response]]
   
   model <- model.frame(mod.work)
+  model[[vars$group]] <- group.key[which(!is.na(data[[vars$response]]))]
   if(plateau){
     model[[vars$segmented]] <- data[[vars$segmented]][!is.na(data[[vars$response]])]
   }
+  # browser()
   z$model <- model
   
   class(z) <- append(paste0("mixedBreak", c("", n.psi)), class(z)) 

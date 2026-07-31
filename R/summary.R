@@ -6,7 +6,7 @@ summary.mixedBreak <- function(z, default = FALSE){
   }
   require(rlang)
   pattern <- z$pattern
-  stopifnot(pattern %in% c("11", "10", "111", "101"))
+  # stopifnot(pattern %in% c("11", "10", "111", "101"))
   
   # browser()
   x <- z$lme.fit

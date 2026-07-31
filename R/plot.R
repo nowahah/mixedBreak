@@ -153,10 +153,12 @@ plot.break.lm <- function(z, breaks = T, fit = T, default = F,
 ##' @export
 plot.mixedBreak1 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .65
+    breaks.ci = FALSE, alpha = .65, y.lim = c(NA, NA)
 ) {
-  require(ggplot2)
+  #TODO - check the script especially call to `[[`
+  # require(ggplot2)
   require(dplyr)
+  
   pattern <- z$pattern
   vars <- z$var.name
   model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))]
@@ -164,15 +166,14 @@ plot.mixedBreak1 <- function(
   names(model.plot)[names(model.plot)==vars$response] <- "yy"
   model.plot$fitted <- z$fitted
   model.plot$psi <- z$psi.i[model.plot$ID]
-  model.plot$psi.y <- (z$psi.i * z$random$time)[model.plot$ID]
+  model.plot$psi.y <- (z$psi.i * z$random[[1]])[model.plot$ID]
   
-  
-  p <- ggplot(model.plot, aes(x=time, y=yy)) +
-    geom_point() +
-    facet_wrap(~ID) +
-    xlab("Time since drug intake (minutes)") +
-    ylab("SDI") + 
-    scale_y_continuous(breaks = seq(0,14,by=2), limits = c(0, 11))
+  p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) +
+    ggplot2::geom_point() +
+    ggplot2::facet_wrap(~ID) + 
+    # ggplot2::scale_y_continuous(breaks = seq(0,14,by=2), limits = y.lim) +
+    ggplot2::xlab("Time since drug intake (minutes)") +
+    ggplot2::ylab("SDI") 
   
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
@@ -192,20 +193,20 @@ plot.mixedBreak1 <- function(
 
   if (breaks) {
     p <- p +
-      geom_point(aes(x = psi, y = psi.y), data = fit.data,
+      ggplot2::geom_point(ggplot2::aes(x = psi, y = psi.y), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      annotate(GeomPoint, x = 0, y = 0, 
+      ggplot2::annotate(ggplot2::GeomPoint, x = 0, y = 0, 
                colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      geom_point(aes(x = max.time, y = yend), data = fit.data,
+      ggplot2::geom_point(ggplot2::aes(x = max.time, y = yend), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     
   }
   if (fit) {
     p <- p +
-      geom_segment(aes(x=0, y=0, xend=psi, yend=psi.y), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha)  +
-      geom_segment(aes(x=psi, y=psi.y, xend=max.time, yend=yend), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha)
+      ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=psi, yend=psi.y), 
+                            data = fit.data, colour = fit.color, lwd = 1, alpha = alpha)  +
+      ggplot2::geom_segment(ggplot2::aes(x=psi, y=psi.y, xend=max.time, yend=yend), 
+                            data = fit.data, colour = fit.color, lwd = 1, alpha = alpha)
   }
   if (breaks.ci) {
     warning("Parameter 'breaks.ci' is ignored at the moment")
@@ -221,13 +222,16 @@ plot.mixedBreak1 <- function(
 ##' The plot has to be adapted
 plot.mixedBreak2 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .65
+    breaks.ci = FALSE, alpha = .65, plateau.mean.constraint = FALSE, y.lim = c(NA, NA)
+    #, cluster = NA, 
 ) {
-  require(ggplot2)
-  require(dplyr)
+  # require(ggplot2)
+  require(dplyr) # operator `%>%`
   
   if(any(diff(t(z$psi.i)) < 0)) {
-    ind.switched <- which(diff(t(z$psi.i)) < 0)
+    # browser()
+    # ind.switched <- which(diff(t(z$psi.i)) < 0)
+    ind.switched <- rownames(z$psi.i)[diff(t(z$psi.i)) < 0]
     warning(paste(
       "Some individuals have switched estimated breakpoints:\n  ",
       z$var.name$group, "= {", paste(ind.switched, collapse = ", "), "}\n  ",
@@ -235,29 +239,33 @@ plot.mixedBreak2 <- function(
     ))
   }
   
+  # browser()
   pattern <- z$pattern
   n.psi <- dim(z$psi.history)[2]
   vars <- z$var.name
   model.plot <- z$model[,unique(c(vars$response, vars$segmented, vars$group))]
   names(model.plot)[names(model.plot)==vars$group] <- "ID"
   names(model.plot)[names(model.plot)==vars$response] <- "yy"
+  names(model.plot)[names(model.plot)==vars$segmented] <- "time"
   model.plot$fitted <- z$fitted
-  model.plot[,paste0("psi.", 1:n.psi)] <- z$psi.i[model.plot$ID, 1:n.psi]
-  model.plot$psi.y <- (z$psi.i[[1]] * z$random[[1]])[model.plot$ID]
+  model.plot$psi <- z$psi.i[model.plot$ID, ]
+  model.plot$psi.y1 <- (z$psi.i[,1] * z$random[[1]])[model.plot$ID]
+  # if(!all(is.na(cluster))){
+  #   model.plot <- model.plot[model.plot[[vars$group]] %in% cluster, ]
+  # }
   
-  
-  p <- ggplot(model.plot, aes(x=time, y=yy)) +
-    geom_point() +
-    facet_wrap(~ID) +
-    xlab("Time since drug intake (minutes)") +
-    ylab("SDI") + 
-    scale_y_continuous(breaks = seq(-20, 50, by=5), limits = c(NA, NA)) +
-    geom_hline(yintercept = 0, lty = "dashed")
+  p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) +
+    ggplot2::geom_point() +
+    ggplot2::facet_wrap(~ID) +
+    ggplot2::xlab("Time since drug intake (minutes)") +
+    ggplot2::ylab("SDI") + 
+    # ggplot2::scale_y_continuous(breaks = seq(-25, 100, by=25), limits = y.lim) +
+    ggplot2::geom_hline(yintercept = 0, lty = "dashed")
   
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
-    psi = unname(z$psi.i[,1:n.psi]),
-    psi.y.1 = z$psi.i[[1]] * z$random[[1]], # there are psi.y1 and psi.y2
+    psi = unname(z$psi.i),
+    psi.y1 = z$psi.i[,1] * z$random[[1]], # there are psi.y1 and psi.y2
     max.time = (model.plot %>% group_by(ID) %>% 
                   summarise(max.time = max(time)))$max.time,
     beta.2 = if_else(
@@ -265,34 +273,49 @@ plot.mixedBreak2 <- function(
       z$random[[1]] + z$random$U1, 0
     )
   )
+  # browser()
+  
+  # if(plateau.mean.constraint){
+  #   fit.data$psi.y1 <- (
+  #     model.plot %>%
+  #       dplyr::group_by(ID) %>%
+  #       dplyr::summarise(plateau.y = mean(yy[(psi.1 < time) & (time < psi.2)]))
+  #     )$plateau.y
+  #   
+  #   p <- plot(z, plateau.mean.constraint = FALSE, 
+  #             fit.color = fit.color, breaks = breaks, cex = cex, alpha = alpha)
+  #   fit.color = "forestgreen"
+  # 
+  # }
+  
   fit.data <- fit.data %>%
-    mutate(
-      psi.y.2 = psi.y.1 + beta.2*(psi.2 - psi.1),
+    dplyr::mutate(
+      psi.y2 = psi.y1 + beta.2*(psi.2 - psi.1),
       beta.3 = beta.2 + z$random$U2,
-      yend = psi.y.2 + beta.3*(max.time-psi.2)
+      yend = psi.y2 + beta.3*(max.time-psi.2)
     )
   # browser()
 
   if (breaks) {
     p <- p +
-      annotate(GeomPoint, x = 0, y = 0, 
+      ggplot2::annotate(ggplot2::GeomPoint, x = 0, y = 0, 
                colour = fit.color, shape = 18, size = 3, alpha = alpha) +
-      geom_point(aes(x = psi.1, y = psi.y.1), data = fit.data,
+      ggplot2::geom_point(ggplot2::aes(x = psi.1, y = psi.y1), data = fit.data,
                  colour = fit.color, shape = 2, size = 3, alpha = alpha) + # square
-      geom_point(aes(x = psi.2, y = psi.y.2), data = fit.data,
+      ggplot2::geom_point(ggplot2::aes(x = psi.2, y = psi.y2), data = fit.data,
                  colour = fit.color, shape = 0, size = 3, alpha = alpha) + # triangle?
-      geom_point(aes(x = max.time, y = yend), data = fit.data,
+      ggplot2::geom_point(ggplot2::aes(x = max.time, y = yend), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     
   }
   if (fit) {
     p <- p +
-      geom_segment(aes(x=0, y=0, xend=psi.1, yend=psi.y.1), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha) +
-      geom_segment(aes(x=psi.1, y=psi.y.1, xend=psi.2, yend=psi.y.2), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha) +
-      geom_segment(aes(x=psi.2, y=psi.y.2, xend=max.time, yend=yend), data = fit.data,
-                   colour = fit.color, lwd = 1, alpha = alpha)
+      ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=psi.1, yend=psi.y1), 
+                            data = fit.data, colour = fit.color, lwd = 1, alpha = alpha) +
+      ggplot2::geom_segment(ggplot2::aes(x=psi.1, y=psi.y1, xend=psi.2, yend=psi.y2), 
+                            data = fit.data, colour = fit.color, lwd = 1, alpha = alpha) +
+      ggplot2::geom_segment(ggplot2::aes(x=psi.2, y=psi.y2, xend=max.time, yend=yend), 
+                            data = fit.data, colour = fit.color, lwd = 1, alpha = alpha)
   }
   if (breaks.ci) {
     warning("Parameter 'breaks.ci' is ignored at the moment")
