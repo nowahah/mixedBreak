@@ -121,7 +121,9 @@ mixed.break <- function(
   }
   
   logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
-  expit <- function(eta) return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
+  expit <- function(eta) {
+    return( (psi.range[1] + psi.range[2] * exp(eta))/(1+exp(eta)) )
+  }
   
   ## Fix a starting value for the change points ====
   ### mlmbreak initialization ====
@@ -141,7 +143,7 @@ mixed.break <- function(
       control = lmbreak::lmbreak.options(n.iter = it.max)
     )
     
-    tbl <- model.tables(lmbreak.fit)
+    tbl <- lmbreak::model.tables(lmbreak.fit)
     breakpoints <- tbl[rep((1:n.ind-1)*(2+n.psi), each=n.psi)+(2:(n.psi+1)), 1:2]
     psi0 <- matrix(breakpoints[,2], ncol = n.psi, byrow = TRUE)
   }
@@ -243,38 +245,23 @@ mixed.break <- function(
     
     # 1. Compute covariates U, G and O ====
     XX$U <- pmax(matrix(0, ncol = n.psi, nrow = n.obs), XX[[vars$segmented]] - XX$psi)
-    XX$V <- -1 * (XX[[vars$segmented]] > XX$psi)
-    XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2 # SCALES
-    XX$VD <- XX$V * XX$D
-    XX$G <- matrix(XX$delta * XX$V * XX$D, ncol = n.psi, nrow = n.obs)
-    
-    # mixed.break.1 code
-    # XX$U1 <- pmax(0, XX[[vars$segmented]] - psi.history[it,1,XX[[vars$group]]])
-    # XX$V1 <- -1 * (XX[[vars$segmented]] > psi.history[it,1,XX[[vars$group]]])
-    # XX$D1 <- ((exp(eta.i) * (psi.range[2] - psi.range[1])) / (1 + exp(eta.i))^2)[XX[[vars$group]]]
-    # XX$G1 <- delta.i[XX[[vars$group]]] * XX$V1 * XX$D1
+    XX$V <- as.matrix(-1 * (XX[[vars$segmented]] > XX$psi))
     
     if(plateau) {
-      # change sign of V before instead: factorizes code later for "Muggeo.less"
       XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1]
-      XX$G[,1] <- (-1)*XX$G[,1]
+      XX$V[,1] <- (-1)*XX$V[,1]
     }
     
-    # XX$Off1 <- -eta.i[XX[[vars$group]]] * XX$G1 # offset term
-    # XX[[vars$response]] <- data[[vars$response]] - XX$Off1
-    
+    XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2 
+    XX$VD <- XX$V * XX$D
+    XX$G <- matrix(XX$delta * XX$V * XX$D, ncol = n.psi, nrow = n.obs)
+
     if(approx == "Muggeo.LMM") {
       XX$O <- -XX$eta * XX$G
       XX$OFF <- rowSums(XX$O)
       XX[[vars$response]] <- data[[vars$response]] - XX$OFF
-    } else if(approx == "Muggeo.less") { 
-      if(plateau){
-        XX$U <- XX$U + XX$eta * XX$VD 
-      } else if(!plateau) {
-        XX$U <- XX$U - XX$eta * XX$VD 
-        # TODO - not for both only for the first column ??
-      }
-      
+    } else if(approx == "Muggeo.less") {
+      XX$U <- XX$U - XX$eta * XX$VD 
     }
     
     
@@ -292,9 +279,9 @@ mixed.break <- function(
       error = function(e){
         stop("Error during LMM estimation: ", e$message)
       }
-    ) 
+    )
     # message or warnings due to singular fits or non CV
-    # (induces by plateau setting, cor(time,U~=-1), or null random effects
+    # (induced by plateau setting, cor(time,U~=-1), or null random effects
     REML.work <- lme4::REMLcrit(mod.work)
     REML.prev <- lme4::REMLcrit(mod.work.prev)
     logLik.diff <- (REML.work - REML.prev)/(REML.work+.1)
@@ -378,7 +365,7 @@ mixed.break <- function(
     } 
   }
   # removing the offset term
-  mod.work@frame[[vars$response]] <- data[[vars$response]][!is.na(data[[vars$response]])]
+  mod.work@frame[[vars$response]] <- XX[[vars$response]][!is.na(XX[[vars$response]])]
   psi.i <- if(n.psi == 1) 
     as.matrix(psi.history[it+1,,])
   else

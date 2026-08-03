@@ -222,7 +222,7 @@ plot.mixedBreak1 <- function(
 ##' The plot has to be adapted
 plot.mixedBreak2 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .65, plateau.mean.constraint = FALSE, y.lim = c(NA, NA)
+    breaks.ci = FALSE, alpha = .75, breaks.vline = FALSE, y.lim = c(NA, NA)
     #, cluster = NA, 
 ) {
   # require(ggplot2)
@@ -274,20 +274,6 @@ plot.mixedBreak2 <- function(
     )
   )
   # browser()
-  
-  # if(plateau.mean.constraint){
-  #   fit.data$psi.y1 <- (
-  #     model.plot %>%
-  #       dplyr::group_by(ID) %>%
-  #       dplyr::summarise(plateau.y = mean(yy[(psi.1 < time) & (time < psi.2)]))
-  #     )$plateau.y
-  #   
-  #   p <- plot(z, plateau.mean.constraint = FALSE, 
-  #             fit.color = fit.color, breaks = breaks, cex = cex, alpha = alpha)
-  #   fit.color = "forestgreen"
-  # 
-  # }
-  
   fit.data <- fit.data %>%
     dplyr::mutate(
       psi.y2 = psi.y1 + beta.2*(psi.2 - psi.1),
@@ -301,9 +287,9 @@ plot.mixedBreak2 <- function(
       ggplot2::annotate(ggplot2::GeomPoint, x = 0, y = 0, 
                colour = fit.color, shape = 18, size = 3, alpha = alpha) +
       ggplot2::geom_point(ggplot2::aes(x = psi.1, y = psi.y1), data = fit.data,
-                 colour = fit.color, shape = 2, size = 3, alpha = alpha) + # square
+                 colour = fit.color, shape = 18, size = 3, alpha = alpha) + # square: 2
       ggplot2::geom_point(ggplot2::aes(x = psi.2, y = psi.y2), data = fit.data,
-                 colour = fit.color, shape = 0, size = 3, alpha = alpha) + # triangle?
+                 colour = fit.color, shape = 18, size = 3, alpha = alpha) + # triangle?
       ggplot2::geom_point(ggplot2::aes(x = max.time, y = yend), data = fit.data,
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     

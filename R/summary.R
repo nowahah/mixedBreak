@@ -22,7 +22,7 @@ summary.mixedBreak <- function(z, default = FALSE){
   print(data.frame(AIC = AIC(x), BIC = BIC(x), logLik = LL, 
                    row.names = " "))
   
-  cat("Pattern:", pattern, "\n\n")
+  cat("Pattern:", pattern, " -  Approximation:", z$approx, "\n\n")
   
   cat("Random effects:\n")
   tmp <- lme4::VarCorr(x) # TODO - arrange names more nicely

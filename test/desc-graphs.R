@@ -6,7 +6,8 @@ library(ggplot2)
 library(dplyr)
 
 ## Basel whole dataset
-ggplot(data = basel, mapping = aes(x=time.num, y=score, colour=Study)) +
+#, shape = type
+ggplot(data = basel, mapping = aes(x=time, y=score, colour=Study)) +
   geom_point() + facet_wrap(~ID) +
   
   # custom y ticks 
@@ -17,8 +18,8 @@ ggplot(data = basel, mapping = aes(x=time.num, y=score, colour=Study)) +
        x = "Time since drug intake (minutes)", y = "Feeling on Visual Analog Scale (0-100)")
 
 ## Basel psilo
-max.time <- basel %>% filter(Study=="SPS" & !is.na(score)) %>% summarise(max(time.num))
-ggplot(data = basel %>% filter(Study=="SPS"), mapping = aes(x=time.num, y=score, colour=Study)) +
+max.time <- basel %>% filter(Study=="SPS" & !is.na(score)) %>% summarise(max(time))
+ggplot(data = basel %>% filter(Study=="SPS"), mapping = aes(x=time, y=score, colour=Study)) +
   geom_point() + facet_wrap(~ID) +
   
   # custom x y ticks 
