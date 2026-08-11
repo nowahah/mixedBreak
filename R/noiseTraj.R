@@ -82,7 +82,7 @@ noiseTraj <- function(true.traj, n.obs, score.sd, times.sd,
   n.break <- nrow(breakpoints) ## nb of breakpoints
   mu <- diff(breakpoints[["bp.x"]])
   std <- breakpoints[["bp.x.sd"]][2:n.break]
-  
+
   ## If we would like to simulate correlated breakpoints -> mvtnorm::rmvnorm
   break.x.dist <- matrix(
     rlnorm(n.obs * (n.break-1), log(mu^2/sqrt(mu^2+std^2)), sqrt(log(1+(std/mu)^2))),

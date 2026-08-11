@@ -35,9 +35,9 @@
 ##' @return TODO
 
 
-# On purpose a very specific function to fit segmented relationship with a mixed
-# model and estimation a single breakpoint. Pattern can be either of four 
-# options in c("11", "10", "101", "111").
+# On purpose a specific function to fit segmented relationship with a mixed
+# model and 1 or 2 breakpoint(s). Pattern can be either of four 
+# options in c("11", "10", "101", "111")
 
 ## * mixed.break
 ##' @export
@@ -60,7 +60,7 @@ mixed.break <- function(
     stop(paste(
       "When specified, `psi.range` must be (non-NA) numeric and same size as number of",
       "breakpoints (", n.psi, ").")
-      )
+    )
   }
   
   if(!(approx %in% c("Muggeo.LMM", "Muggeo.LM", "Muggeo.less")))
@@ -97,7 +97,7 @@ mixed.break <- function(
   }
   
   # model frame
-  group.key <- as.factor(as.character(data[[vars$group]]))
+  group.key <- as.factor(data[[vars$group]])
   XX <- data.frame(
     y = data[[vars$response]],
     time = data[[vars$segmented]],
@@ -255,7 +255,7 @@ mixed.break <- function(
     XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2 
     XX$VD <- XX$V * XX$D
     XX$G <- matrix(XX$delta * XX$V * XX$D, ncol = n.psi, nrow = n.obs)
-
+    
     if(approx == "Muggeo.LMM") {
       XX$O <- -XX$eta * XX$G
       XX$OFF <- rowSums(XX$O)

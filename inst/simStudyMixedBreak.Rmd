@@ -42,11 +42,14 @@ true.parameters <- read_excel("../data/true_parameters_mixedBreak.xlsx",
                               sheet = "true.parameters")
 scenario.data <- read_excel("../data/true_parameters_mixedBreak.xlsx", 
                             sheet = "scenario.data")
-# all.seeds <- read_excel("../data/random_seed_mixedBreak.xlsx", 
-# sheet = "all.seeds")$allseeds
+all.seeds <- read_excel("../data/random_seed_mixedBreak.xlsx",
+                        sheet = "all.seeds")$allseeds
 # ending.seed <- read_excel("data/random_seed.xlsx", sheet = "ending.seed")$ending.seed
 # restore with .GlobalEnv$.Random.seed <- ending.seed
 TRUE.PSI <- 77
+true.parameters <- true.parameters %>%
+  group_by(simID) %>%
+  mutate(psi = mean(break.x1))
 ```
 
 
@@ -134,7 +137,6 @@ $$
 \forall i \in \{1, \dots, n\} \\
 \end{cases}
 $$
-
 The breakpoints $\psi_i$ are modeled as:
 $$
 \forall i \in \{1, \dots, n\}, \hspace{5mm}
@@ -146,7 +148,6 @@ $k_i \overset{iid}{\sim} \cal{N}(0, \tau^2) \perp \varepsilon_{ij}$.
 The variance $\tau^2$ of the random effect $k_i$ on the breakpoint estimate is of great interest to evaluate between subjects disparities in breakpoint value.
 
 2. A linear mixed model with breakpoint estimation. This model enforces a plateau phase in the second segment. We will refer to it as the '10-model' or the 'plateau model'. The model's equation is:
-
 $$
 \begin{split}
 \forall i \in \{1, \dots, n\}, \forall j \in \{1, \dots, T_i\}, \hspace{5mm}
@@ -154,7 +155,6 @@ y_{ij} & = \beta_{1i} t_{ij} - \beta_{1i} (t_{ij} - \psi_i)_+ + \varepsilon_{ij}
 & = \beta_{1i} (t_{ij} - (t_{ij} - \psi_i)_+) + \varepsilon_{ij}
 \end{split}
 $$
-
 With the same assumption as previoulsy on the random effects and the breakpoint model.
 In the second phase the outcome is modeled as a constant: $\forall i,j, \hspace{2mm} \mathbb{E}[y_{ij}|t_{ij} > \psi_i] = \beta_{1i} \psi_i$.
 
@@ -262,7 +262,7 @@ This quantifies to an average bias of ~1.2 minutes for this scenario.
 
 Most importantly, the scenario-wise distribution is the following:
 
-```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM (Unconstrained model) - orange line is target $\\psi=77$"}
+```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM (Unconstrained model) - orange line is target $\\psi=77$. One outlier sits a little over 150 min for DGM(2)"}
 dataset11.dgm <- estimates.11 %>%
   select(simID, break.x1.avg) %>%
   distinct() %>%
@@ -271,6 +271,7 @@ dataset11.dgm <- estimates.11 %>%
   distinct()
 
 # boxplot
+ylim.dist <- c(60, 110)
 ggplot(dataset11.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   # ylim(25, 100) +
   geom_boxplot() +
@@ -278,7 +279,7 @@ ggplot(dataset11.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   coord_flip() +
   scale_x_discrete(labels = latex_labels) +
   # labs(subtitle = TeX("orange line is the target: simulated mean of breakpoint $\\psi=77$")) +
-  ylim(60, 125.5) +
+  ylim(ylim.dist) +
   ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
 # ggsave("figs/dist-mixed-all.png", width = 148, height = 105, units = "mm")
@@ -290,7 +291,7 @@ This panel reflects that the overestimation of the breakpoint distribution is di
 
 The method appears to be sensible to the probability of having an outlier ( the higher the probability, the higher the bias). It also  looks sensible to individual breakpoint deviation: the higher it is, the higher the estimated breakpoint dispersion is.
 
-One exceptional outlier occurred with an estimated breakpoint over $150$ minutes, for the DGM with the highest breakpoint individual deviation.
+One exceptional outlier occurred with an estimated breakpoint over $150$ minutes (not displayed for scaling sake), for the DGM with the highest breakpoint individual deviation.
 
 This model is miss-specified in comparison to the simulated data, given that it has an additional degree of freedom on the second phase slope, which distributions are displayed below:
 
@@ -325,7 +326,7 @@ estimates.11 %>%
 
 Overall, the distributions of second phase slope are close to 0 in magnitude: for all DGM, 50% of estimated values are contained within $[\pm0.05]$. At the more extreme, we find $8$ values of second phase slope such that $|\beta_{2}| > 0.02$. 
 
-We note here that we do not find any outlier that could correspond to the breakpoint estimate outlier spotted before for DGM(7). In fact, the second-phase slope distribution looks normal if not for its slight overestimation above $\beta_2=0$. Nonetheless, all but one (out of 8316) second phase slope are estimated to be non significantly different from 0.
+We note here that we do not find any outlier that could correspond to the breakpoint estimate outlier spotted before for DGM(7). In fact, the second-phase slope distribution looks normal if not for its slight overestimation above $\beta_2=0$ in some specific scenarios. Nonetheless, all but one (out of 8316) second phase slopes are estimated to be non significantly different from 0.
 
 
 ### Plateau model
@@ -347,12 +348,12 @@ ggplot(dataset10.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   coord_flip() +
   scale_x_discrete(labels = latex_labels) +
   ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
-  # ylim(60, 125.5) +
+  ylim(ylim.dist) +
   xlab("(scenario.nb) parameter varying from reference")
 # ggsave("figs/dist-plateau-all.png", width = 148, height = 105, units = "mm")
 ```
 
-The overall distribution also appears to slightly overestimate the breakpoint for the plateau model.
+The overall distribution also appears to overestimate the breakpoint for the plateau model.
 
 It does appear slightly worse than the miss-specified unconstrained model in terms of bias. However we can see on a scaled graph (not displayed here) that the dispersion of the estimates distribution is lower for the plateau model.
 
@@ -432,6 +433,7 @@ dataset2.dgm %>% select(scenarLabel, rho) %>% distinct() %>% arrange(desc(rho))
 This panel exhibits homogeneous between-method correlations among the different DGM, the lowest being 0.81 for the scenario with the highest standard deviation on breakpoint $\sigma_\psi=33$, and the highest being 0.95 for the one with the longest plateau duration $T_{peak}=143$ minutes. In both cases these min and max correlation scenarios were the same than for the comparison between Unconstrained linear mixed model VS Plateau linear model of the previous simulation study (package `segmented`).
 
 Overall, the correlation in the breakpoint estimate between the two methods is high, reflecting agreement between the estimates of both methods.
+
 Additionally, we plot below the same graph between the unconstrained model and the same model in another implementation (package `segmented`, function `segmented.lme`):
 
 ```{r biv-plot-dgm-muggeo, fig.width=10, warning=FALSE, fig.align='center', fig.cap="Bivariate plot of breakpoint estimates $\\hat{\\psi_d}$ from both methods, for all DGM"}
@@ -473,7 +475,7 @@ Under or over coverage typically arises in one of three situations:
 
 1. Bias in the breakpoint estimate $\hat\psi_d$ ;
 1. Mis-estimated empirical SE $\hat s_{\hat\psi_d}$ of breakpoint estimate. Exempt of bias, underestimating this quantity leads to undercoverage, and overestimating it leads to overcoverage.
-1. Estimates distribution assumption is not met. Here we saw on the empirical distribution that normality appears reasonable, so we can reasonably exclude this ingredient for explaining potential issues.
+1. Estimates distribution assumption is not met. We saw earlier on the empirical distribution of the breakpoint estimates $\hat\psi_d$ that normality appears reasonable, we can therefore reasonably exclude this ingredient for explaining potential issues.
 
 
 ### Unconstrained model
@@ -513,7 +515,10 @@ p <- ggplot(dataset %>% filter(method=="Unconstrained" & !is.na(contains)),
   theme(legend.position = "bottom")
 
 simsum.11 <- simsum(
-  dataset %>% filter(method=="Unconstrained"),
+  dataset %>% 
+    filter(method=="Unconstrained") %>% 
+    select(-ends_with(".ind")) %>% 
+    distinct(),
   estvarname = "break.x1.avg",
   se = "break.x1.sd",
   true = TRUE.PSI, # true value of estimated parameter
@@ -639,6 +644,7 @@ The results are presented as point estimate along with their **Monte Carlo Stand
 
 ```{r performance-table}
 # computing the table of performance measurements
+# CAREFUL break.sd is on LOGIT SCALE !!
 typeIerr <- .05
 formatted.res <- summ$summ %>%
   mutate(
@@ -648,7 +654,7 @@ formatted.res <- summ$summ %>%
   arrange(scenarOrder) %>%
   left_join(scenario.data %>% select(scenarID, scenarLabel), by = join_by(scenarLabel)) %>%
   # select(-c("lower", "upper")) %>%
-  filter(stat %in% c("bias", "empse", "modelse", "cover", "becover")) %>%
+  filter(stat %in% c("bias", "cover", "becover")) %>% # , "empse", "modelse"
   pivot_wider(names_from = method, values_from = c(est:mcse, lower:upper)) %>%
   arrange(scenarOrder, stat) %>%
   rename(
@@ -697,8 +703,8 @@ formatted.res %>%
   tab_stubhead(label = md("**DGM**")) %>%
   cols_align(align = "left", columns = scenarLabel) %>%
   tab_spanner(label=md("**Bias**"), columns=ends_with("_bias")) %>%
-  tab_spanner(label=md("**Empirical SE**"), columns=ends_with("_empse")) %>%
-  tab_spanner(label=md("**Model SE**"), columns=ends_with("_modelse")) %>%
+  # tab_spanner(label=md("**Empirical SE**"), columns=ends_with("_empse")) %>%
+  # tab_spanner(label=md("**Model SE**"), columns=ends_with("_modelse")) %>%
   tab_spanner(label=md("**Coverage**"), columns=ends_with("_cover")) %>%
   tab_spanner(label=md("**Bias-Eliminated Coverage**"), columns=ends_with("_becover")) %>%
   tab_options(table.font.size = 12) %>%

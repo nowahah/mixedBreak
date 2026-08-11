@@ -6,7 +6,9 @@ library(rlang) # Error in names(res[[1]]) %||% "" : could not find function "%||
 source("R/trueTraj.R")
 source("R/noiseTraj.R")
 source("R/normalize.R")
+source("R/confint.R")
 source("R/print.R")
+source("R/plot.R")
 source("R/mixed.break1.R")
 source("R/confint.R")
 
@@ -136,6 +138,7 @@ estimates.10 <- data.frame(
 start.time <- Sys.time()
 sim.nb <- 0 # iterator count
 for (ii in 1:nrow(scenario.data)){
+  # browser()
   
   # homogeneous scenario setting
   n.patients <- scenario.data[ii, "n.obs"]
@@ -146,6 +149,9 @@ for (ii in 1:nrow(scenario.data)){
   outlier.prob <- scenario.data[ii, "outlier.prob"]
   
   score.sd <- list("slope" = score.sd.slopes, "plateau" = plateau.sd)
+  # # cheating - noise free data
+  # score.sd <- list("slope" = 0.01, "plateau" = 0.01)
+  # outlier.prob <- 0
   
   break.3 <- data.frame(
     pattern = c(1, 0, NA),
@@ -161,6 +167,7 @@ for (ii in 1:nrow(scenario.data)){
   for (jj in 1:n.sim){
     
     ## increment
+    # browser()
     sim.nb = sim.nb + 1
     
     # # debug - go to a specific iteration
@@ -294,12 +301,12 @@ print(end.time-start.time)
 # Estimated ~8.5h of simulation
 
 
-# ## WRITING RESULTS IN FILE
-library(writexl)
-write_xlsx(estimates.11, "data/estimates_11.xlsx")
-write_xlsx(estimates.10, "data/estimates_10.xlsx")
-write_xlsx(list(true.parameters=true.parameters, scenario.data = scenario.data),
-           "data/true_parameters_mixedBreak.xlsx")
-write_xlsx(list(all.seeds=data.frame(allseeds), ending.seed=data.frame(ending.seed)),
-           "data/random_seed_mixedBreak.xlsx")
-# last 2 should be the same as before, right ?
+# # ## WRITING RESULTS IN FILE
+# library(writexl)
+# write_xlsx(estimates.11, "data/estimates_11.xlsx")
+# write_xlsx(estimates.10, "data/estimates_10.xlsx")
+# write_xlsx(list(true.parameters=true.parameters, scenario.data = scenario.data),
+#            "data/true_parameters_mixedBreak.xlsx")
+# write_xlsx(list(all.seeds=data.frame(allseeds), ending.seed=data.frame(ending.seed)),
+#            "data/random_seed_mixedBreak.xlsx")
+# # last 2 should be the same as before, right ?

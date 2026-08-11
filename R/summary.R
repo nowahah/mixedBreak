@@ -19,12 +19,9 @@ summary.mixedBreak <- function(z, default = FALSE){
   }
   
   cat("Segmented mixed-effects model fit by REML \n")
-  print(data.frame(AIC = AIC(x), BIC = BIC(x), logLik = LL, 
-                   row.names = " "))
+  print(data.frame(LogLik = LL, REML = lme4::REMLcrit(x), row.names = " "))
   
-  cat("Pattern:", pattern, " -  Approximation:", z$approx, "\n\n")
-  
-  cat("Random effects:\n")
+  cat("\nRandom effects:\n")
   tmp <- lme4::VarCorr(x) # TODO - arrange names more nicely
   print(tmp)
   # FINAL - adapt names of variables for printing like below
@@ -42,20 +39,36 @@ summary.mixedBreak <- function(z, default = FALSE){
   t.val <- summary(z$lme.fit.check)$coefficients[, "t value"]
   t.val <- t.val[names(t.val) %in% paste0("VD", c("", 1:n.psi))]
   p.val <- pt(t.val, df = n.obs - (n.group + length(x@beta)) + 1) # significance of eta
-  if(all(p.val > 0.05)) {
-    eta.flag <- "YES" # good
-  } else {
-    eta.flag <- "NO" # bad, we want estimated eta to be steady around former value tilde
-  }
-  cat("\nSteady breakpoint linear predictor at convergence ( eta≈tilde(eta) ):", 
-      eta.flag, "- p.values:\n")
-  cat(paste(paste0(" - eta.break.", 1:n.psi), round(p.val, 3), sep = ": ", 
+  # if(all(p.val > 0.05)) { # threshold issue
+  #   eta.flag <- "YES" # good
+  # } else {
+  #   eta.flag <- "NO" # bad, we want hat(eta) to be steady around old value tilde(eta)
+  # }
+  # cat("\nSteady breakpoint linear predictor at convergence:", 
+  #     eta.flag, "- p.values:\n") # i.e. eta≈tilde(eta)
+  cat("\nSteady breakpoint linear predictor at convergence:\n") 
+  cat(paste(paste0(" - eta.break.", 1:n.psi), round(p.val, 3), sep = ": p = ", 
             collapse = " \n"), "\n")
+  cat("Low p-value indicates evidence of convergence issues.\n")
   #PSILINK
+  
+  # summary(psi.i)
+  cat("\nIndividual breakpoints summary:\n")
+  break.summ <- summary(z$psi.i[,1])
+  if(n.psi > 1){
+    for(i in 2:(n.psi))
+    break.summ <- rbind(break.summ, summary(z$psi.i[,i]))
+  }
+  rownames(break.summ) <- paste0("break.", 1:n.psi)
+  print(break.summ)
   
   # TODO - check validity since Muggeo excluded breakpoint estimate from the fit here
   # cat("\nStandardized Within-Group Residuals:\n")
   # print(resd)
+  
+  cat("\nPattern:", pattern)
+  cat("\nApproximation:", z$approx)
+  
   cat("\nNumber of Observations:", n.obs)
   cat("\nNumber of Groups:", n.group, "\n")
   

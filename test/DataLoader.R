@@ -12,14 +12,22 @@ basel$PatientID <- as.factor(basel$PatientID)
 basel$time <- as.numeric(as.character(basel$time))
 names(basel)[2] = "ID"
 basel <- as.data.frame(basel)
+library(dplyr)
+basel <- basel %>%
+  mutate(psilo.mg = case_when(
+    Study == "SPS" ~ 25,
+    Study == "LPS" ~ 30,
+    Study == "LPS-L" ~ 15,
+    Study == "LPM" ~ 20,
+    .default = NA
+  ))
 
 # Reducing length of leading/ending constant sequences of observations
 # up to tolerance `tol` (nothing happens if tol<0)
-library(dplyr)
 # Trimming quasi-constant sequences (up to `tol`) of length >= `m̀in.length`
 # to match length = `min.length-1L`
 min.length <- 2L # >= 2L , minimum length of sequence of be trimmed
-tol <- 2 # >= 0 , numerical tolerance to declare a sequence as constant
+tol <- 0 # >= 0 , numerical tolerance to declare a sequence as constant
 # nothing happens if tol < 0
 basel <- basel %>%
   filter(!is.na(score)) %>%
@@ -40,7 +48,7 @@ basel <- basel %>%
     # rev.row.nb = rev(rev.row.nb > 0),
     end.trail = rev(cumsum(rev.high) == 0),
     type = if_else(beg.trail | end.trail, "trailing", "signal"),
-    type = if_else(is.na(type), "signal", type)
+    type = as.factor(if_else(is.na(type), "signal", type))
   ) %>%
   select(names(basel), type)
 

@@ -11,18 +11,21 @@ confint.mixedBreak <- function(z, level = 0.95){
   fixed.se <- z$fixed[,"Std. Error"]
   
   alpha.lvl <- 1 - level
+  # browser()
   ci <- matrix(
-    fixed, nrow = 2, ncol = length(fixed), byrow = TRUE,
-    dimnames = list(paste0(100*c(alpha.lvl/2, 1-alpha.lvl/2), "%"),
+    fixed, nrow = 3, ncol = length(fixed), byrow = TRUE,
+    dimnames = list(paste0(100*c(alpha.lvl/2, .5, 1-alpha.lvl/2), "%"),
                     names(fixed.se))
   )
-  ci <- ci + t(t(c(-1, 1)*qnorm(1 - alpha.lvl/2))) %*% fixed.se
+  ci <- ci + t(t(c(-1, 0, 1)*qnorm(1 - alpha.lvl/2))) %*% fixed.se
+  rownames(ci)[2] <- "Point Est."
 
-  # rescale breakpoint parameters
+  # rescaling breakpoint parameters
   # TODO - only for a shared scale for both breakpoints
   n.psi <- nchar(z$pattern) - 1L
   a <- z$psi.range
   
+  # browser()
   expit <- function(x) (a[1] + a[2]*  exp(x))/(1+exp(x))
   ci[,stringr::str_detect(colnames(ci), "break.")] <- 
     expit(ci[,stringr::str_detect(colnames(ci), "break.")])

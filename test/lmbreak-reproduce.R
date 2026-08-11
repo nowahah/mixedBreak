@@ -17,20 +17,33 @@ str(SDIpsilo)
 
 
 ## Multiple clusters (patients)
-e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
+system.time(
+  e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
                     trace = FALSE)
+)
+# system.time(e.XPall <- mlmbreak(score ~ 0 + bp(time, "1010"), cluster = "ID", 
+#                                 data = basel[basel$Study != "SPS",], trace = FALSE))
 summary(e.XPall)
 tbl <- model.tables(e.XPall)
+tbl %>% 
+  tidyr::pivot_wider(id_from = "id", values_from = c("time", "intercept"))
 plot(e.XPall)
+ggsave("../../figures/basel/lmbreak-1010-noSPS.png",
+       width = 4*148, height = 4*105, units = "mm")
 
-breakpoints <- tbl[rep((1:15-1)*4,each=2)+2:4, 2]
+breakpoints <- tbl[rep((1:15-1)*4,each=3)+2:4, 2]
 breakpoints <- matrix(breakpoints, ncol = 3, byrow = T) # breakpoints
 breakpoints <- as.data.frame(breakpoints)
-names(breakpoints) = paste0("break.x", 1:3)
+names(breakpoints) = c(paste0("psi.", 1:2), "max.time")
 intercept <- coef(e.XPall, type="intercept")[rep((1:15-1)*4)+2, 2]
 b.onset <- tbl[(1:15-1)*4+1, 5] # onset slopes
 b.return <- tbl[(1:15-1)*4+3, 5] # return to normal slopes
 peak.duration <- tbl[(1:15-1)*4+3, 2] # duration of plateau
+breakpoints$psi.y1 <- intercept
+breakpoints$beta.2 <- 0
+breakpoints$beta.3 <- b.return
+breakpoints$ID <- unique(tbl$id)
+
 
 library(rgl)
 plot3d(x=b.onset, y=b.return, z=peak.duration,

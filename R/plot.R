@@ -183,11 +183,12 @@ plot.mixedBreak1 <- function(
                   group_by(ID) %>% 
                   summarise(max.time = max(time)))$max.time
   )
+  # browser()
   fit.data <- fit.data %>%
     mutate(
       beta.2 = if_else(
         rep(pattern=="11", nlevels(model.plot$ID)),
-        z$random$U + z$random[[1]], 0
+        rowSums(z$random %>% select(starts_with("U"))), 0
       ),
       yend = psi.y + (max.time-psi)*beta.2)
 
@@ -222,7 +223,8 @@ plot.mixedBreak1 <- function(
 ##' The plot has to be adapted
 plot.mixedBreak2 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .75, breaks.vline = FALSE, y.lim = c(NA, NA)
+    fit.avg = FALSE, breaks.vline = FALSE, alpha = .75, y.lim = c(NA, NA),
+    breaks.ci = FALSE
     #, cluster = NA, 
 ) {
   # require(ggplot2)
@@ -247,9 +249,8 @@ plot.mixedBreak2 <- function(
   names(model.plot)[names(model.plot)==vars$group] <- "ID"
   names(model.plot)[names(model.plot)==vars$response] <- "yy"
   names(model.plot)[names(model.plot)==vars$segmented] <- "time"
-  model.plot$fitted <- z$fitted
-  model.plot$psi <- z$psi.i[model.plot$ID, ]
-  model.plot$psi.y1 <- (z$psi.i[,1] * z$random[[1]])[model.plot$ID]
+  # browser()
+  # model.plot$ID <- factor(model.plot$ID, levels = as.character(1:nlevels(model.plot$ID)))
   # if(!all(is.na(cluster))){
   #   model.plot <- model.plot[model.plot[[vars$group]] %in% cluster, ]
   # }
@@ -257,10 +258,10 @@ plot.mixedBreak2 <- function(
   p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) +
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~ID) +
+    ggplot2::scale_y_continuous(breaks = seq(0, 10, by=2), limits = y.lim) +
+    # ggplot2::geom_hline(yintercept = 0, lty = "dashed") +
     ggplot2::xlab("Time since drug intake (minutes)") +
-    ggplot2::ylab("SDI") + 
-    # ggplot2::scale_y_continuous(breaks = seq(-25, 100, by=25), limits = y.lim) +
-    ggplot2::geom_hline(yintercept = 0, lty = "dashed")
+    ggplot2::ylab("Subjective Drug Intensity (0 - 10)") 
   
   fit.data <- data.frame(
     ID = factor(levels(model.plot$ID), levels = levels(model.plot$ID)),
@@ -294,6 +295,7 @@ plot.mixedBreak2 <- function(
                  colour = fit.color, shape = 18, size = 3, alpha = alpha)
     
   }
+  # individual fit
   if (fit) {
     p <- p +
       ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=psi.1, yend=psi.y1), 
@@ -303,8 +305,50 @@ plot.mixedBreak2 <- function(
       ggplot2::geom_segment(ggplot2::aes(x=psi.2, y=psi.y2, xend=max.time, yend=yend), 
                             data = fit.data, colour = fit.color, lwd = 1, alpha = alpha)
   }
+  # marginal fit
+  if (fit.avg) {
+    # browser()
+    avg.data <- data.frame(t(confint(z)[2,]))
+    names(avg.data)[3:4] <- paste0("psi.", 1:n.psi) 
+    avg.data$psi.y1 <- avg.data$time.beta.1 * avg.data$psi.1
+    avg.data$psi.y2 <- avg.data$psi.y1 #ONLY FOR 101
+    avg.data$max.time <- mean(fit.data$max.time)
+    avg.data$yend <- avg.data$psi.y2 + avg.data$time.delta.3 * (avg.data$max.time - avg.data$psi.2)
+    # TODO - mutate
+    avg.color <- "red3"
+    fit.alpha <- alpha * 0.65
+    p <- p +
+      ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=psi.1, yend=psi.y1), 
+                            data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha) +
+      ggplot2::geom_segment(ggplot2::aes(x=psi.1, y=psi.y1, xend=psi.2, yend=psi.y2), 
+                            data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha) +
+      ggplot2::geom_segment(ggplot2::aes(x=psi.2, y=psi.y2, xend=max.time, yend=yend), 
+                            data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha)
+    
+    # TODO - add break symbol
+    
+  }
+  
+  if (breaks.vline) {
+    p <- p +
+      ggplot2::geom_segment(ggplot2::aes(x = psi.1, y = 0, yend = psi.y1),
+                            data = fit.data, alpha = alpha, lty = "dashed") +
+      ggplot2::geom_segment(ggplot2::aes(x = psi.2, y = 0, yend = psi.y2),
+                            data = fit.data, alpha = alpha, lty = "dashed")
+  }
+  
   if (breaks.ci) {
-    warning("Parameter 'breaks.ci' is ignored at the moment")
+    message("Parameter 'breaks.ci' is ignored at the moment")
+    # browser()
+    # fixed-effects CI95%
+    psi.ci <- confint(z)[,paste0("break.", 1:n.psi)]
+    # random-effects CI95% ?
+    # combination of both, taking fixed/random effects correlation ??
+    
+    # p +
+    #   ggplot2::geom_segment(ggplot2::aes(x = psi.ci[[1]], xend = psi.ci[[2]], y=0))
+    # currently only fixed effects are computed
+      
   }
   
   p
