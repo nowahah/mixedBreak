@@ -7,7 +7,7 @@ library(dplyr)
 
 ## Basel whole dataset
 #, shape = type
-ggplot(data = basel, mapping = aes(x=time, y=score, colour=Study)) +
+ggplot(basel %>% filter(Study!="SPS"), aes(x=time, y=score, colour=Study)) +
   geom_point() + facet_wrap(~ID) +
   
   # custom y ticks 
@@ -16,6 +16,10 @@ ggplot(data = basel, mapping = aes(x=time, y=score, colour=Study)) +
   # labels
   labs(title = "Patient's feeling of the experiment over time",
        x = "Time since drug intake (minutes)", y = "Feeling on Visual Analog Scale (0-100)")
+
+ggplot2::ggsave("../../figures/basel/gg-basel-all-butSPS.png",
+                width = 3*148, height = 3*105, units = "mm")
+
 
 ## Basel psilo
 max.time <- basel %>% filter(Study=="SPS" & !is.na(score)) %>% summarise(max(time))
@@ -31,7 +35,7 @@ ggplot(data = basel %>% filter(Study=="SPS"), mapping = aes(x=time, y=score, col
        x = "Time since drug intake (minutes)", y = "Feeling on Visual Analog Scale (0-100)")
 
 
-## NRU psilo ???
+## NRU psilo ?
 head(SDIpsilo.ext)
 
 ## NRU Psilo

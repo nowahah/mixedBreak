@@ -17,10 +17,10 @@ str(SDIpsilo)
 
 
 ## Multiple clusters (patients)
-system.time(
-  e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
+# system.time(
+e.XPall <- mlmbreak(score ~ 0 + bp(time, "101"), cluster = "id", data = SDIpsilo,
                     trace = FALSE)
-)
+# )
 # system.time(e.XPall <- mlmbreak(score ~ 0 + bp(time, "1010"), cluster = "ID", 
 #                                 data = basel[basel$Study != "SPS",], trace = FALSE))
 summary(e.XPall)

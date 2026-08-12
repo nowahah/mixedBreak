@@ -39,13 +39,9 @@ summary.mixedBreak <- function(z, default = FALSE){
   t.val <- summary(z$lme.fit.check)$coefficients[, "t value"]
   t.val <- t.val[names(t.val) %in% paste0("VD", c("", 1:n.psi))]
   p.val <- pt(t.val, df = n.obs - (n.group + length(x@beta)) + 1) # significance of eta
-  # if(all(p.val > 0.05)) { # threshold issue
-  #   eta.flag <- "YES" # good
-  # } else {
-  #   eta.flag <- "NO" # bad, we want hat(eta) to be steady around old value tilde(eta)
-  # }
   # cat("\nSteady breakpoint linear predictor at convergence:", 
   #     eta.flag, "- p.values:\n") # i.e. eta≈tilde(eta)
+  browser()
   cat("\nSteady breakpoint linear predictor at convergence:\n") 
   cat(paste(paste0(" - eta.break.", 1:n.psi), round(p.val, 3), sep = ": p = ", 
             collapse = " \n"), "\n")
@@ -59,7 +55,7 @@ summary.mixedBreak <- function(z, default = FALSE){
     for(i in 2:(n.psi))
     break.summ <- rbind(break.summ, summary(z$psi.i[,i]))
   }
-  rownames(break.summ) <- paste0("break.", 1:n.psi)
+  if(n.psi > 1) rownames(break.summ) <- paste0("break.", 1:n.psi)
   print(break.summ)
   
   # TODO - check validity since Muggeo excluded breakpoint estimate from the fit here
