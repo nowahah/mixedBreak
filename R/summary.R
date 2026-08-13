@@ -41,7 +41,7 @@ summary.mixedBreak <- function(z, default = FALSE){
   p.val <- pt(t.val, df = n.obs - (n.group + length(x@beta)) + 1) # significance of eta
   # cat("\nSteady breakpoint linear predictor at convergence:", 
   #     eta.flag, "- p.values:\n") # i.e. eta≈tilde(eta)
-  browser()
+  # browser()
   cat("\nSteady breakpoint linear predictor at convergence:\n") 
   cat(paste(paste0(" - eta.break.", 1:n.psi), round(p.val, 3), sep = ": p = ", 
             collapse = " \n"), "\n")
@@ -49,7 +49,7 @@ summary.mixedBreak <- function(z, default = FALSE){
   #PSILINK
   
   # summary(psi.i)
-  cat("\nIndividual breakpoints summary:\n")
+  cat("\nIndividual breakpoint(s) summary:\n")
   break.summ <- summary(z$psi.i[,1])
   if(n.psi > 1){
     for(i in 2:(n.psi))
