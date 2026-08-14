@@ -47,10 +47,10 @@ mixed.break <- function(
     psi.history = TRUE, x = FALSE, y = FALSE, dev.step = 0)
 {
   # Input checking ===
-  if(!(pattern %in% c("11", "10", "111", "101", "1010")))
+  if(!(pattern %in% c("10", "101", "1010"))) # "11", "111", 
     stop(paste(
       "'pattern' should either be one of four options:",
-      "c('11', '10', '111', '101').\n  See documentation for signification."))
+      "c('10', '101', '1010').\n  See documentation for signification."))
   # FINAL - could be manageable to add new breakpoint
   # just have to be careful with breakpoint order when plotting
   
@@ -80,6 +80,8 @@ mixed.break <- function(
   vars$fixed <- form.label[!stringr::str_detect(form.label, stringr::fixed("|"))]
   if(!attr(terms(formula), "intercept")){
     vars$fixed <- c(vars$fixed, "0") 
+  } else {
+    stop("No intercept is allowed in the model for now (add `0 + ` to formula).")
   }
   vars$segmented <- vars$fixed[1]
   vars$random <- form.label[stringr::str_detect(form.label, stringr::fixed("|"))]
@@ -109,19 +111,17 @@ mixed.break <- function(
   n.ind <- nlevels(XX[[vars$group]])
   n.psi <- nchar(pattern) - 1L
   n.obs <- nrow(XX)
-  n.slopes <- sum(as.numeric(strsplit(pattern, "")[[1]]))
-  # plateau <- (substr(pattern, 2L, 2L) == "0")
-  plateau <- stringr::str_locate_all(pattern, "1+0+")[[1]]
+  plateau <- (substr(pattern, 2L, 2L) == "0")
+  plateau.new <- stringr::str_locate_all(pattern, "1+0+")[[1]]
   # split the pattern in sub-patterns that ends with 0
   
-
+  
   # 0. Initialization ====
   
   ## Psi range (breakpoints) ====
   if(all(is.na(psi.range)) & length(psi.range) == 1L){
     # default 10-90% quantile of segmented variable
-    psi.range <- unname(quantile(XX[[vars$segmented]][!is.na(XX[[vars$response]])], 
-                                 probs = c(1, 9)/10))
+    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
   }
   
   logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
@@ -182,24 +182,10 @@ mixed.break <- function(
   }
   if (length(psi0)==n.psi) psi0 <- matrix(rep(psi0, n.ind), ncol = n.psi, byrow = T)
   MIN.SEG <- min(XX[[vars$segmented]])
-  psi0 <- unname(cbind(0, psi0)) 
+  psi0 <- unname(cbind(MIN.SEG, psi0)) 
   # one psi per segment <=> segmented variable is U[,1]
   # browser()
-  rep.id <- function(x, nc, nr, rep = FALSE, type = c("mat", "vec")) {
-    browser()
-    XX[[vars$group]]
-    
-    res <- NA
-    if("mat" %in% type) {
-      res <- matrix(x, nrow = nr, ncol = nc)
-    } else if ("vec" %in% type) {
-      res <- x
-    } else {
-      browser()
-      stop("'type' argument must be one of c('mat', 'vec')")
-    }
-  }
-
+  
   ## Compute the U variate ====
   # Here and in the rest of this function, variable(s) U are named only after
   # the letter, but are declined into n.psi+1 sub-columns
@@ -208,31 +194,31 @@ mixed.break <- function(
     # browser()
     if(!is.null(ncol(psi))) {
       # compute U - variables
-      nc <- ncol(psi)
+      n.col <- ncol(psi)
     } else {
       # compute tilde(U) - variables with only one plateau
-      nc <- 1
+      n.col <- 1
     }
     
     res <- matrix(
       pmax(0, t - psi),
       nrow = n.obs, 
-      ncol = nc
+      ncol = n.col
     )
     return(res)
   }
   XX$U <- relu(XX[[vars$segmented]], psi0[XX[[vars$group]],])
   vars$fixed <- c(vars$fixed, "U")
   vars$random <- c(vars$random, "U")
-  vars$fixed <- setdiff(vars$fixed, vars$segmented) # U[,1] is segmented var
+  vars$fixed <- setdiff(vars$fixed, vars$segmented) 
   vars$random <- setdiff(vars$fixed, vars$segmented)
   
-  if(any(plateau)){
+  if(any(plateau.new)){
     # XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1]
     
     # Only works for alternating 1 and 0
-    peak.start <- plateau[, "start"]
-    peak.end <- plateau[, "end"]
+    peak.start <- plateau.new[, "start"]
+    peak.end <- plateau.new[, "end"]
     XX$U[, peak.start] <- XX$U[, peak.start] - relu(
       XX$U[, peak.start], 
       psi0[XX[[vars$group]], peak.end] - psi0[XX[[vars$group]], peak.start]
@@ -263,17 +249,17 @@ mixed.break <- function(
   )
   if(dev.step==-1) return(mod.init)
   mod.work <- mod.init
-
+  
   delta.i <- coef(mod.init)[[vars$group]]
-  delta.i <- delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:n.slopes))]
+  delta.i <- delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:n.psi))]
   delta.i <- unname(as.matrix(delta.i))
   # sum of fixed & random coef
   
   # browser()
   eta.i <- logit(matrix(psi0[, 1+1:n.psi], ncol = n.psi))
-  XX$psi <- psi0[XX[[vars$group]],] # n.obs x (n.psi+1)
-  XX$eta <- eta.i[XX[[vars$group]],] # n.obs x n.psi # PB n.psi==1
-  XX$delta <- matrix(delta.i[XX[[vars$group]],], nrow = n.obs) # n.obs x n.slopes
+  XX$psi <- psi0[XX[[vars$group]],] # creates multiples col if n.psi > 2
+  XX$eta <- eta.i[XX[[vars$group]],]
+  XX$delta <- matrix(delta.i[XX[[vars$group]],], nrow = n.obs)
   
   ## FOR loop setup ====
   it <- 0
@@ -291,52 +277,48 @@ mixed.break <- function(
     it <- it + 1
     
     # 1. Compute covariates U, G and O ====
-    # browser() # check OFFSET, XX and sub-vars dim
+    # browser()
     # XX$U <- pmax(matrix(0, ncol = n.psi, nrow = n.obs), 
     # XX[[vars$segmented]] - XX$psi)
-    XX$U <- relu(XX[[vars$segmented]], XX$psi) 
+    XX$U <- relu(XX[[vars$segmented]], XX$psi)
     # n.obs x (n.psi + 1)
     XX$V <- as.matrix(-1 * (XX[[vars$segmented]] > XX$psi[, 1+1:n.psi])) 
     # n.obs x n.psi
     
     # browser()
-    if(any(plateau)) {
+    if(any(plateau.new)) {
       # XX$U[,1] <- XX[[vars$segmented]] - XX$U[,1] # 1 w\ ncol(psi0) = n.psi
       # XX$V[,1] <- (-1)*XX$V[,1]
       
-      # XX$U[, peak.start] <- XX$U[, peak.start] - relu(
-      #   XX$U[, peak.start], XX$psi[, peak.start+1] - XX$psi[, peak.start]
-      # )
       XX$U[, peak.start] <- XX$U[, peak.start] - relu(
-        XX[[vars$segmented]], XX$psi[, peak.start+1]
+        XX$U[, peak.start], XX$psi[, peak.start+1] - XX$psi[, peak.start]
       )
       # drop non tilde(U)-variables in 10-segments
-      XX$U <- XX$U[,-peak.end] # n.obs x n.slopes
+      XX$U <- XX$U[,-peak.end]
       
-      XX$V[,peak.start] <- (-1)*XX$V[,peak.start] # n.obs x n.psi
+      XX$V[,peak.start] <- (-1)*XX$V[,peak.start]
     }
     
     XX$D <- (exp(XX$eta) * diff(psi.range)) / (1 + exp(XX$eta))^2 
-    XX$VD <- XX$V * XX$D # n.obs x n.psi
+    XX$VD <- XX$V * XX$D
     
     # browser() # which deltas w\ which G ?
-    # if(any(plateau)){
-    #   # specific to alternating 1s and 0s
-    dt.ind <- cumsum(strsplit(pattern, "")[[1]])[1+1:n.psi]
-    XX$G <- matrix(XX$delta[,dt.ind] * XX$VD, ncol = n.psi, nrow = n.obs)
-    # } else {
-    #   XX$G <- matrix(XX$delta * XX$VD, ncol = n.psi, nrow = n.obs)
-    # }
+    if(any(plateau.new)){
+      # specific to alternating 1s and 0s
+      dt.ind <- cumsum(strsplit(pattern, "")[[1]])[1+1:n.psi]
+      XX$G <- matrix(XX$delta[,dt.ind] * XX$VD, ncol = n.psi, nrow = n.obs)
+    } else {
+      XX$G <- matrix(XX$delta * XX$VD, ncol = n.psi, nrow = n.obs)
+    }
     
     # browser()
     if(approx == "Muggeo.LMM") {
-      XX$O <- - XX$eta * XX$G
+      XX$O <- -XX$eta * XX$G
       XX$OFF <- rowSums(XX$O)
       XX[[vars$response]] <- data[[vars$response]] - XX$OFF
     } else if(approx == "Muggeo.less") {
       # specific to alternating 1s and 0s
-      XX$U <- XX$U - XX$eta * XX$VD # not ready for 1010
-      browser()
+      XX$U <- XX$U - XX$eta * XX$VD
     }
     
     
@@ -370,22 +352,16 @@ mixed.break <- function(
       eta.i[,colnames(eta.i) %in% paste0("G", c("", 1:n.psi))], ncol = n.psi
     )
     
-    XX$eta <- matrix(unname(eta.i[XX[[vars$group]],]), ncol = n.psi)
-    XX$psi <- unname(cbind(0, expit(XX$eta)))
+    XX$eta <- unname(eta.i[XX[[vars$group]],])
+    XX$psi <- unname(cbind(MIN.SEG, expit(XX$eta)))
     psi.history[it+1,,] <- t(expit(eta.i))
     
-    # delta.i <- coef(mod.work)[[vars$group]]
-    # delta.i <- as.matrix(
-    #   delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:(n.psi+1)))], ncol = n.psi
-    # )
-    # PROBLEM - select columns properly hey
-    
-    delta.i <- coef(mod.init)[[vars$group]]
-    delta.i <- delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:(n.psi+1)))]
-    XX$delta <- as.matrix(delta.i, ncol = n.slopes)[XX[[vars$group]],]
-    XX$delta <- unname(as.matrix(XX$delta, ncol = n.slopes))
-    
-    # delta.i <- unname(as.matrix(delta.i))
+    delta.i <- coef(mod.work)[[vars$group]]
+    delta.i <- as.matrix(
+      delta.i[,colnames(delta.i) %in% paste0("U", c("", 1:n.psi))], ncol = n.psi
+    )
+    XX$delta <- delta.i[XX[[vars$group]],]
+    XX$delta <- unname(as.matrix(XX$delta))
     
   }
   ## END FOR
@@ -435,48 +411,15 @@ mixed.break <- function(
     paste0("(logit.)break.", 1:n.psi)
   )
   # TODO - beta & delta names
-  
   # removing the offset term
   mod.work@frame[[vars$response]] <- XX[[vars$response]][!is.na(XX[[vars$response]])]
   if(n.psi == 1) {
     psi.i <- as.matrix(psi.history[it+1,,])
-  } else {
+  } else{
     psi.i <- t(psi.history[it+1,,])
   }
   rownames(psi.i) <- levels(group.key)
   # colnames(psi.i) <- paste0("break.", 1:n.psi)
-  
-  if(any(diff(t(psi.i)) < 0)) {
-    # browser()
-    sw.psi.ind <- which(diff(t(psi.i)) < 0, arr.ind = TRUE)
-    switch12 <- rownames(psi.i)[sw.psi.ind[,2] * 1*(sw.psi.ind[,1]==1)]
-    # there is probably a smarter way of doing this
-    switch23 <- rownames(psi.i)[sw.psi.ind[,2] * 1*(sw.psi.ind[,1]==2)]
-    switch.id <- paste("- Break 1 & 2 switched:\n  ",
-      vars$group, "= {", paste(switch12, collapse = ", "), "}"
-    )
-    
-    if(length(switch23) > 0){
-      switch.id <- paste(
-        switch.id, "\n - !! Break 2 & 3 switched: \n  ",
-        vars$group, "= {", paste(switch23, collapse = ", "), "}\n  "
-      )
-      # TODO - modify switch id to include switch 2 and 3 then print WARNING
-      warning(paste(
-        "Some individuals have switched estimated breakpoints:\n",
-        switch.id, "\n   Pattern", pattern, "may not fit well those groups.\n"
-      ))
-    } else {
-      message(
-        paste(
-          "Some individuals have switched estimated breakpoints:\n",
-          switch.id, "\n   Pattern", pattern, "may not fit well those groups.\n"
-        )
-      )
-    }
-  }
-  
-  
   # browser()
   rd.coef <- coef(mod.work)[[vars$group]]
   rownames(rd.coef) <- levels(group.key)

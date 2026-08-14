@@ -2,6 +2,7 @@
 source/*
 data/*
 inst/*
+!inst/figures/*
 !inst/*.Rmd
 !inst/*.docx
 

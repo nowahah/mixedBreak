@@ -153,7 +153,7 @@ plot.break.lm <- function(z, breaks = T, fit = T, default = F,
 ##' @export
 plot.mixedBreak1 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    breaks.ci = FALSE, alpha = .65, y.lim = c(NA, NA)
+    alpha = .65, y.lim = c(NA, NA), fit.avg = FALSE, breaks.vline = FALSE
 ) {
   #TODO - check the script especially call to `[[`
   # require(ggplot2)
@@ -183,7 +183,7 @@ plot.mixedBreak1 <- function(
                   group_by(ID) %>% 
                   summarise(max.time = max(time)))$max.time
   )
-  browser()
+  # browser()
   fit.data <- fit.data %>%
     mutate(
       beta.2 = if_else(
@@ -209,8 +209,32 @@ plot.mixedBreak1 <- function(
       ggplot2::geom_segment(ggplot2::aes(x=psi, y=psi.y, xend=max.time, yend=yend), 
                             data = fit.data, colour = fit.color, lwd = 1, alpha = alpha)
   }
-  if (breaks.ci) {
-    warning("Parameter 'breaks.ci' is ignored at the moment")
+  # marginal fit
+  if (fit.avg) {
+    # browser()
+    avg.data <- data.frame(t(confint(z)[2,]))
+    # names(avg.data)[3:4] <- paste0("psi.", 1:n.psi) 
+    avg.data$psi.y1 <- avg.data$time.1 * avg.data$break.1
+    if(pattern=="10") avg.data$time.2 <- - avg.data$time.1
+    avg.data$beta.2 <- avg.data$time.2 + avg.data$time.1
+    avg.data$max.time <- mean(fit.data$max.time)
+    avg.data$yend <- avg.data$psi.y1 + avg.data$beta.2 * (avg.data$max.time - avg.data$break.1)
+    # TODO - mutate
+    avg.color <- "red2"
+    fit.alpha <- alpha / 3
+    p <- p +
+      ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=break.1, yend=psi.y1), 
+                            data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha) +
+      ggplot2::geom_segment(ggplot2::aes(x=break.1, y=psi.y1, xend=max.time, yend=yend), 
+                            data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha)
+
+    # TODO - add break symbol ? 
+  }
+  
+  if (breaks.vline) {
+    p <- p +
+      ggplot2::geom_segment(ggplot2::aes(x = psi, y = 0, yend = psi.y),
+                            data = fit.data, alpha = alpha, lty = "dashed")
   }
   
   return(p)
@@ -324,7 +348,7 @@ plot.mixedBreak2 <- function(
     avg.data$yend <- avg.data$psi.y2 + avg.data$beta.3 * (avg.data$max.time - avg.data$break.2)
     # TODO - mutate
     avg.color <- "red2"
-    fit.alpha <- alpha * 0.5
+    fit.alpha <- alpha * 0.33
     p <- p +
       ggplot2::geom_segment(ggplot2::aes(x=0, y=0, xend=break.1, yend=psi.y1), 
                             data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha) +
@@ -334,7 +358,6 @@ plot.mixedBreak2 <- function(
                             data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha)
     
     # TODO - add break symbol ? 
-    
   }
   
   if (breaks.vline) {
@@ -363,15 +386,14 @@ plot.mixedBreak2 <- function(
 }
 
 
-## Method for object of class 'mixedBreak2'
+## Method for object of class 'mixedBreak3'
 ##' @export
 ##' # Careful here, when pattern == "1010" and breakpoints are switched,
 ##' The plot has to be adapted
 plot.mixedBreak3 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
-    fit.avg = FALSE, breaks.vline = FALSE, alpha = .75, y.lim = c(NA, NA),
-    breaks.ci = FALSE
-    #, cluster = NA, 
+    fit.avg = FALSE, breaks.vline = FALSE, alpha = .75, y.lim = c(NA, NA)
+    #, breaks.ci = FALSE, cluster = NA, 
 ) {
   require(dplyr) # operator `%>%`
   
@@ -379,6 +401,7 @@ plot.mixedBreak3 <- function(
     stop("Only pattern '1010' is allowed for 3 breakpoints mixed model")
   }
   
+  ind.switched <- NA
   if(any(diff(t(z$psi.i)) < 0)) {
     # browser()
     ind.switched <- rownames(z$psi.i)[which(diff(t(z$psi.i)) < 0, arr.ind = TRUE)[,2]]
