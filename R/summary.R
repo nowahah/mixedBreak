@@ -6,8 +6,7 @@ summary.mixedBreak <- function(z, default = FALSE){
   }
   require(rlang)
   pattern <- z$pattern
-  # stopifnot(pattern %in% c("11", "10", "111", "101"))
-  
+
   # browser()
   x <- z$lme.fit
   LL <- as.numeric(logLik(x))
@@ -39,8 +38,6 @@ summary.mixedBreak <- function(z, default = FALSE){
   t.val <- summary(z$lme.fit.check)$coefficients[, "t value"]
   t.val <- t.val[names(t.val) %in% paste0("VD", c("", 1:n.psi))]
   p.val <- pt(t.val, df = n.obs - (n.group + length(x@beta)) + 1) # significance of eta
-  # cat("\nSteady breakpoint linear predictor at convergence:", 
-  #     eta.flag, "- p.values:\n") # i.e. eta≈tilde(eta)
   # browser()
   cat("\nSteady breakpoint linear predictor at convergence:\n") 
   cat(paste(paste0(" - eta.break.", 1:n.psi), round(p.val, 3), sep = ": p = ", 
@@ -48,7 +45,6 @@ summary.mixedBreak <- function(z, default = FALSE){
   cat("Low p-value indicates evidence of convergence issues.\n")
   #PSILINK
   
-  # summary(psi.i)
   cat("\nIndividual breakpoint(s) summary:\n")
   break.summ <- summary(z$psi.i[,1])
   if(n.psi > 1){

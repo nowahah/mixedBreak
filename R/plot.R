@@ -183,7 +183,7 @@ plot.mixedBreak1 <- function(
                   group_by(ID) %>% 
                   summarise(max.time = max(time)))$max.time
   )
-  # browser()
+  browser()
   fit.data <- fit.data %>%
     mutate(
       beta.2 = if_else(
@@ -272,7 +272,7 @@ plot.mixedBreak2 <- function(
   # browser()
   fit.data <- fit.data %>%
     mutate(
-      psi.y1 = if_else(!switch12, time.1 * break.1, time.1 * break.2),
+      psi.y1 = time.1 * pmin(break.1, break.2),
       # time.2 = if_else(!switch12 & pattern == "101", 0, time.1+time.3),
       beta.2 = case_when(
         !switch12 & pattern == "101" ~ 0, 
@@ -333,7 +333,7 @@ plot.mixedBreak2 <- function(
       ggplot2::geom_segment(ggplot2::aes(x=break.2, y=psi.y2, xend=max.time, yend=yend), 
                             data = avg.data, colour = avg.color, lwd = 1, alpha = fit.alpha)
     
-    # TODO - add break symbol
+    # TODO - add break symbol ? 
     
   }
   
@@ -365,7 +365,7 @@ plot.mixedBreak2 <- function(
 
 ## Method for object of class 'mixedBreak2'
 ##' @export
-##' # Careful here, when pattern == "101" and breakpoints are switched,
+##' # Careful here, when pattern == "1010" and breakpoints are switched,
 ##' The plot has to be adapted
 plot.mixedBreak3 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
@@ -408,26 +408,26 @@ plot.mixedBreak3 <- function(
   p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) +
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~ID) +
-    # ggplot2::scale_y_continuous(breaks = seq(0, 100, by=25), limits = y.lim) +
+    ggplot2::scale_y_continuous(breaks = seq(0, 120, by=25), limits = y.lim) +
     ggplot2::xlab("Time since drug intake (minutes)") +
     ggplot2::ylab("Subjective Drug Intensity on Visual Analog Scale (0 - 100)") 
   
   # browser()
   fit.data <- coef(z) %>%
-    mutate(switch12 = break.2-break.1 < 0,
+    mutate(switch12 = break.2 < break.1,
            ID = levels(model.plot$ID))
 
   fit.data <- fit.data %>%
     mutate(
-      psi.y1 = if_else(!switch12, time.1 * break.1, time.1 * break.2),
+      psi.y1 = time.1 * pmin(break.1, break.2),
       time.2 = if_else(!switch12, 0, time.1+time.3),
       psi.y2 = psi.y1 + time.2 * abs(break.2 - break.1),#if_else(!switch12, 1, NA),
-      yend = psi.y2 + time.3 * (break.3 - if_else(!switch12, break.2, break.1)),
+      yend = psi.y2 + time.3 * (break.3 - pmax(break.2, break.1)),
       max.time = (model.plot %>% group_by(ID) %>% 
                     summarise(max.time = max(time)))$max.time
     )
   fit.data[, stringr::str_detect(names(fit.data), "break.")] <-
-    t(apply(z$psi.i, 1, sort))
+    t(apply(z$psi.i, 1, sort)) 
   
   if (breaks) {
     p <- p +
