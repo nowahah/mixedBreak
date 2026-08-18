@@ -5,7 +5,7 @@
 ##' breakpoint estimates, in the formulation described in Muggeo (2014), 
 ##' allowing for random effects on the breakpoint estimates.
 ##'
-##' @param formula a two-sided linear formula object describing both the 
+##' @param formula A two-sided linear formula object describing both the 
 ##' fixed-effects and random-effects part of the model, with the response on 
 ##' the left of `~` operator and the terms, separated by + operators, on the 
 ##' right. Random-effects terms are distinguished by vertical bars (|) 
@@ -14,25 +14,32 @@
 ##' @param psi0 [numeric] an optional starting value for the breakpoint 
 ##' estimates (first guess). 
 ##' It must be a numeric value in the range of the segmented variable. 
-##' Default is the middle of the observed segmented variable values 
-##' (`mean(range(time))`).
-##' @param pattern [character] One of the two following options: \itemize{
-##' \item '11' for a two-phases relationship with both slopes estimated 
-##' (assumed non-null) ;\n
+##' Default are quantile(s) of segmented variable with a response that is not 
+##' \code{NA}. quantile are equally spaced in probability.
+##' @param pattern [character] One of the 3 following options: \itemize{
 ##' \item '10' for a two-phases relationship with a non-null slope followed by
 ##'  a constant segment (second-phase slope is forced to 0) ;\n
-##' \item '111' for a three-phases relationship with all 3 slopes estimated 
-##' (assumed non-null) ;\n
 ##' \item '101' for a three-phases relationship with one non-null slope 
 ##' followed by a constant segment (second phase slope is forced to 0) and 
-##' another non-null slope.
+##' another non-null slope;\n
+##' \item '1010' for a four-phases relationship with an alternating of linear 
+##' non-null phases, and constant phases (phases 1 & 3 slopes are estimated, 
+##' phases 2 & 4 slopes are null).
 ##' }
 ##' @param it.max [integer>0] Maximum number of iterations allowed. Default to
-##' 10. A warning is emitted is the maximum number of iterations is reached.
+##' 1\code{20L}. A warning is emitted is the maximum number of iterations is reached.
 ##' @param x,y [logical] If TRUE the corresponding components of the fit 
 ##' (the model matrix, the response) are returned.
 ##'
-##' @return TODO
+##' @return an list of class c('mixedBreak', 'mixedBreak{n.psi}') with n.psi being
+##' the number of breakpoints specified. The most interesting component are:
+##' @param lme.fit The fitted lme object at convergence.
+##' @param fixed,random Fixed and Random-effects coefficients of the fit. G-like
+##' variable (_i.e._ breakpoints) are on logit scale.
+##' @param psi.i A matrix (n.ind x n.psi) containing the subject-specific breakpoints 
+##' estimates (fixed + random).
+##' @param fitted Vector of fitted values. It has the same length as the response 
+##' in \code{data}.
 
 
 # On purpose a specific function to fit segmented relationship with a mixed
@@ -87,7 +94,8 @@ mixed.break <- function(
   vars$random <- form.label[stringr::str_detect(form.label, stringr::fixed("|"))]
   vars$random <- strsplit(vars$random, split = " | ", fixed=TRUE)[[1]]
   vars$group <- vars$random[2]
-  vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]] 
+  vars$random <- strsplit(vars$random[1], " + ", fixed = TRUE)[[1]]
+  na.response <- is.na(data[[vars$response]])
   # one single grouping variable assumed
   
   if(!all(setdiff(unique(unlist(vars)), c("1", "0", "-1")) %in% names(data))) {
@@ -420,6 +428,8 @@ mixed.break <- function(
   }
   rownames(psi.i) <- levels(group.key)
   # colnames(psi.i) <- paste0("break.", 1:n.psi)
+  fit.val <- rep(NA, length(data[[vars$response]]))
+  fit.val[!na.response] <- mod.work@resp$mu + XX$OFF[!na.response]
   # browser()
   rd.coef <- coef(mod.work)[[vars$group]]
   rownames(rd.coef) <- levels(group.key)
@@ -428,8 +438,8 @@ mixed.break <- function(
     fixed = summ$coefficients,
     random = rd.coef,
     psi.i = psi.i,
-    fitted = mod.work@resp$mu,
-    off = XX$OFF[!is.na(data[[vars$response]])],
+    fitted = fit.val,
+    off = XX$OFF,
     logLik = logLik(mod.work),
     REML = REML.work,
     psi.history = psi.history[1:(it+1),,],

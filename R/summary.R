@@ -1,4 +1,17 @@
-## Method for object of class 'mixedBreak'
+### summary.mixedBreak.R ---
+## * summary.mixedBreak (documentation)
+##' @title Summarize model fits for segmented mixed-effects regression
+##' @description \code{summary} method for class \code{mixed.break}
+##' 
+##' @param z an object of class "mixedBreak", usually, a result of a call to
+##' `mixed.break` (TODO - make link to mixed.break documentation)
+##' @param default [logical] use default list summary (default is FALSE).
+##' 
+##' @details This function computes and print a list of summary statistics of the
+##' fitted segmented linear mixed-effects model
+##' 
+##' @return Returns the fitted object \code{z}.
+##'
 ##' @export
 summary.mixedBreak <- function(z, default = FALSE){
   if(default) {
