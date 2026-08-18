@@ -10,7 +10,7 @@ You can use `pak` package to install the latest stable version of `mixedBreak`:
 
 ```r
 # install.packages("pak")
-pak::pak("nowahah/mixedBreak@v0.0.0") # TODO - change when stable version out
+pak::pak("nowahah/mixedBreak@ab925f2") 
 ```
 
 
@@ -20,7 +20,7 @@ The functionalities of the package will be exemplified on the following dataset:
 
 ```r
 library(mixedBreak)
-data(SDIpsilo, package = "lmbreak") # TODO - update before release
+data(SDIpsilo, package = "mixedBreak")
 str(SDIpsilo)
 ```
 
@@ -59,7 +59,7 @@ Available patterns either one of `c('10','101', '1010')`. Unconstrained model wi
 plot(bp.fit, fit.avg = TRUE)
 ```
 
-![Individual fits (orange lines) and average fit (red line) of the segmented mixed model - `pattern = 101`](inst/figures/gg-SDI-101-avgfit.png){width=500}
+![Individual fits (orange lines) and average fit (red line) of the segmented mixed model - `pattern = 101`](inst/figures/gg-SDI-101-avgfit.png)
 
 
 On the panel, one can see the marginal fit in faded red, and the individual fit in orange. Marginal fit can of course be removed by letting `fit.avg=FALSE` (default).
