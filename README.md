@@ -27,7 +27,7 @@ str(SDIpsilo)
 where the experience of 15 individuals after drug intake is monitored over time:
 
 
-![Subjective Drug Intensity in 15 healthy individuals after drug intake (t=0min)](inst/figures/gg-SDI-all.png){width=500}
+![Subjective Drug Intensity in 15 healthy individuals after drug intake (t=0min)](inst/figures/gg-SDI-all.png)
 
 
 The `mixed.break` function can be used to model the experience of the patients using a segmented mixed model. This model not only estimates the regression coefficients in every segment, but also the breakpoint values themselves, for every individual.
@@ -71,7 +71,7 @@ On the panel, one can see the marginal fit in faded red, and the individual fit 
 
 The estimation procedures is mostly based on the work on [(Muggeo, 2014)](doi:10.1177/1471082X13504721) article. The formulation of the model, in the case of the `pattern = 101`, is the following (assuming that individual breakpoints are ordered):
 
-
+  
 ![Model formulation for `pattern=101`](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D%5Cbg%7Bwhite%7Dy_%7Bij%7D=%5Cbeta_%7B1i%7D(t_%7Bij%7D-(t_%7Bij%7D-%5Cpsi_%7B1i%7D)_&plus;)&plus;%5Cbeta_%7B3i%7D(t_%7Bij%7D-%5Cpsi_%7B2i%7D)_&plus;&plus;%5Cvarepsilon_%7Bij%7D=%5Cbegin%7Bcases%7D%5Cbeta_%7B1i%7Dt_%7Bij%7D&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7Dt_%7Bij%7D%3C%20%5Cpsi_%7B1i%7D%5C%5C%20%5Cbeta_%7B1i%7D%5Cpsi_%7Bij%7D&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7D%5Cpsi_%7B1i%7D%5Cleq%20t_%7Bij%7D%3C%20%5Cpsi_%7B2i%7D%5C%5C%20%20%5Cbeta_%7B1i%7D%5Cpsi_%7Bij%7D&plus;%5Cbeta_%7B3i%7D(t_%7Bij%7D-%5Cpsi_%7B2i%7D)&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7D%5Cpsi_%7B2i%7D%5Cleq%20t_%7Bij%7D%5Cend%7Bcases%7D)
 
 

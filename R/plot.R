@@ -150,7 +150,7 @@ plot.break.lm <- function(z, breaks = T, fit = T, default = F,
 
 
 ## Method for object of class 'mixedBreak1'
-##' @export
+#' @export
 plot.mixedBreak1 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
     alpha = .65, y.lim = c(NA, NA), fit.avg = FALSE, breaks.vline = FALSE
@@ -242,9 +242,8 @@ plot.mixedBreak1 <- function(
 
 
 ## Method for object of class 'mixedBreak2'
-##' @export
-##' # Careful here, when pattern == "101" and breakpoints are switched,
-##' The plot has to be adapted
+## Plot is adated if ind breakpoints are switched
+#' @export
 plot.mixedBreak2 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
     fit.avg = FALSE, breaks.vline = FALSE, alpha = .75, y.lim = c(NA, NA)
@@ -387,9 +386,7 @@ plot.mixedBreak2 <- function(
 
 
 ## Method for object of class 'mixedBreak3'
-##' @export
-##' # Careful here, when pattern == "1010" and breakpoints are switched,
-##' The plot has to be adapted
+#' @export
 plot.mixedBreak3 <- function(
     z, breaks = TRUE, fit = TRUE, fit.color = "orange2", lwd = 2, cex = 1, 
     fit.avg = FALSE, breaks.vline = FALSE, alpha = .75, y.lim = c(NA, NA)
