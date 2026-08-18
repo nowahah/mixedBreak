@@ -26,9 +26,9 @@ str(SDIpsilo)
 
 where the experience of 15 individuals after drug intake is monitored over time:
 
-<center>
-![Subjective Drug Intensity in 15 healthy individuals after drug intake (t=0min)](./inst/figures/gg-SDI-all.png?raw=true){width=500}
-</center>
+
+![Subjective Drug Intensity in 15 healthy individuals after drug intake (t=0min)](inst/figures/gg-SDI-all.png){width=500}
+
 
 The `mixed.break` function can be used to model the experience of the patients using a segmented mixed model. This model not only estimates the regression coefficients in every segment, but also the breakpoint values themselves, for every individual.
 
@@ -59,9 +59,8 @@ Available patterns either one of `c('10','101', '1010')`. Unconstrained model wi
 plot(bp.fit, fit.avg = TRUE)
 ```
 
-<center>
-![Individual fits (orange lines) and average fit (red line) of the segmented mixed model - `pattern = 101`](./inst/figures/gg-SDI-101-avgfit.png?raw=true){width=500}
-</center>
+![Individual fits (orange lines) and average fit (red line) of the segmented mixed model - `pattern = 101`](inst/figures/gg-SDI-101-avgfit.png){width=500}
+
 
 On the panel, one can see the marginal fit in faded red, and the individual fit in orange. Marginal fit can of course be removed by letting `fit.avg=FALSE` (default).
 
@@ -72,9 +71,9 @@ On the panel, one can see the marginal fit in faded red, and the individual fit 
 
 The estimation procedures is mostly based on the work on [(Muggeo, 2014)](doi:10.1177/1471082X13504721) article. The formulation of the model, in the case of the `pattern = 101`, is the following (assuming that individual breakpoints are ordered):
 
-<center>
+
 ![Model formulation for `pattern=101`](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D%5Cbg%7Bwhite%7Dy_%7Bij%7D=%5Cbeta_%7B1i%7D(t_%7Bij%7D-(t_%7Bij%7D-%5Cpsi_%7B1i%7D)_&plus;)&plus;%5Cbeta_%7B3i%7D(t_%7Bij%7D-%5Cpsi_%7B2i%7D)_&plus;&plus;%5Cvarepsilon_%7Bij%7D=%5Cbegin%7Bcases%7D%5Cbeta_%7B1i%7Dt_%7Bij%7D&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7Dt_%7Bij%7D%3C%20%5Cpsi_%7B1i%7D%5C%5C%20%5Cbeta_%7B1i%7D%5Cpsi_%7Bij%7D&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7D%5Cpsi_%7B1i%7D%5Cleq%20t_%7Bij%7D%3C%20%5Cpsi_%7B2i%7D%5C%5C%20%20%5Cbeta_%7B1i%7D%5Cpsi_%7Bij%7D&plus;%5Cbeta_%7B3i%7D(t_%7Bij%7D-%5Cpsi_%7B2i%7D)&plus;%5Cvarepsilon_%7Bij%7D&%20%5Ctext%7Bif%7D%5Chspace%7B2mm%7D%5Cpsi_%7B2i%7D%5Cleq%20t_%7Bij%7D%5Cend%7Bcases%7D)
-</center>
+
 
 It is a piece-wise linear model of time, with random effects on the slopes &beta; and the breakpoints &psi;. This degree of freedom on the breakpoints allows for estimating subject-specific breakpoints, thus modelling heterogeneity between trajectories.
 
