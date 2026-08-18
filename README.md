@@ -10,7 +10,7 @@ You can use `pak` package to install the latest stable version of `mixedBreak`:
 
 ```r
 # install.packages("pak")
-pak::pak("nowahah/mixedBreak@ab925f2") 
+pak::pak("nowahah/mixedBreak@53a429b") 
 ```
 
 
