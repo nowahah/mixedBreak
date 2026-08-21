@@ -108,3 +108,5 @@ treatment for depression study. Statistical Modelling. 2014 Aug ;14(4):293–313
 2. segmented: Regression Models with Break-Points / Change-Points Estimation (with Possibly Random
 Effects) [Internet]. 2003 [cited 2026 Mar 24]. Available from: https://cran.r-project.org/package=segmented
 doi:10.32614/CRAN.package.segmented
+3. Stenbæk DS, Madsen MK, Ozenne B, Kristiansen S, Burmester D, Erritzoe D, et al. Brain serotonin 2A receptor binding predicts subjective temporal and mystical effects of psilocybin in healthy humans. J Psychopharmacol. 2021 Apr;35(4):459–68. doi:10.1177/0269881120959609
+

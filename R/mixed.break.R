@@ -129,7 +129,8 @@ mixed.break <- function(
   ## Psi range (breakpoints) ====
   if(all(is.na(psi.range)) & length(psi.range) == 1L){
     # default 10-90% quantile of segmented variable
-    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(1, 9)/10))
+    psi.range <- unname(quantile(XX[[vars$segmented]], probs = c(5, 95)/100)
+    )
   }
   
   logit <- function(psi) return( log((psi-psi.range[1])/(psi.range[2]-psi)) )
@@ -325,7 +326,7 @@ mixed.break <- function(
       XX$OFF <- rowSums(XX$O)
       XX[[vars$response]] <- data[[vars$response]] - XX$OFF
     } else if(approx == "Muggeo.less") {
-      # specific to alternating 1s and 0s
+      # working only for 10, 101, NOT 1010
       XX$U <- XX$U - XX$eta * XX$VD
     }
     
@@ -429,7 +430,11 @@ mixed.break <- function(
   rownames(psi.i) <- levels(group.key)
   # colnames(psi.i) <- paste0("break.", 1:n.psi)
   fit.val <- rep(NA, length(data[[vars$response]]))
-  fit.val[!na.response] <- mod.work@resp$mu + XX$OFF[!na.response]
+  fit.val[!na.response] <- mod.work@resp$mu
+  if(approx == "Muggeo.LMM"){
+    fit.val[!na.response] <- fit.val[!na.response] + XX$OFF[!na.response]
+  }
+  
   # browser()
   rd.coef <- coef(mod.work)[[vars$group]]
   rownames(rd.coef) <- levels(group.key)
