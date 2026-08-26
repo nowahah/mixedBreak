@@ -24,6 +24,7 @@ inst/*.html
 *-test.R
 *dev.R
 
+
 # Output files from R CMD build
 /*.tar.gz
 

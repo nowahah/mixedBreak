@@ -277,13 +277,18 @@ plot.mixedBreak2 <- function(
     paste(levels(model.plot$ID)[levels(model.plot$ID) %in% ind.switched], "(*)")
 
   
-  p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) +
+  p <- ggplot2::ggplot(model.plot, ggplot2::aes(x=time, y=yy)) + # , color = "black"
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~ID) +
     # ggplot2::scale_y_continuous(breaks = seq(0, 10, by=2), limits = y.lim) +
     # ggplot2::geom_hline(yintercept = 0, lty = "dashed") +
     ggplot2::xlab("Time since drug intake (minutes)") +
     ggplot2::ylab("Subjective Drug Intensity (0 - 10)") 
+  
+  # p +
+  #   theme(legend.position = c(0.8, 0.1),
+  #         legend.background = element_rect(fill = "white"))
+  # legend in last empty panel - only if time allows it
   
   # browser()
   fit.data <- coef(z) %>%

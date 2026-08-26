@@ -17,6 +17,7 @@ bibliography: "biblio.bib"
 ```{r setup, include=FALSE, fig.align='center'}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "/indirect/student/noahdegoulange/github/mixedBreak/inst")
+# setwd("inst")
 ```
 
 
@@ -35,7 +36,7 @@ library(glue)
 
 
 ```{r load_results, include=FALSE}
-estimates.11 <- read_excel("../data/estimates_11.xlsx")
+# estimates.lme <- read_excel("../data/estimates_11.xlsx")
 estimates.lme <- read_excel("../data/estimates_seglme.xlsx")
 estimates.10 <- read_excel("../data/estimates_10.xlsx", guess_max = 10000L)
 true.parameters <- read_excel("../data/true_parameters_mixedBreak.xlsx", 
@@ -62,6 +63,7 @@ for(i in 1:nrow(scenario.data)){
                           scenario.data[i, scenario.data$fac.var[i]])
 }
 scenarLabel[ref.ind] <- paste(scenarLabel[ref.ind], "(REF)") # should I ?
+# scenarLabel[ref.ind] <- "(12) (REF)"
 reorder.index <- c(2,1,12,11,13,14,9,10, 3,5,6,7,8,4) # custom display order
 scenario.data$scenarLabel <- as.factor(scenarLabel)
 scenario.data$scenarLabel <- factor(scenario.data$scenarLabel,
@@ -70,8 +72,8 @@ levels(scenario.data$scenarLabel) <- paste0("(", 1:nrow(scenario.data), ") ",
                                             levels(factor(scenario.data$scenarLabel)))
 
 latex_labels <- c(
-  TeX("(1) $\\sigma_{\\psi}$ = 5"),
-  TeX("(2) $\\sigma_{\\psi}$ = 33"),
+  TeX("(1) $\\tau_{\\psi}$ = 5"),
+  TeX("(2) $\\tau_{\\psi}$ = 33"),
   TeX("(3) $T_{\"peak\"}$ = 32"),
   TeX("(4) $T_{\"peak\"}$ = 143"),
   TeX("(5) $\\sigma_{\\epsilon}$ = 0.5"),
@@ -81,19 +83,20 @@ latex_labels <- c(
   TeX("(9) $n_{\"obs\"}$ = 10"),
   TeX("(10) $n_{\"obs\"}$ = 15"),
   TeX("(11) $n_{\"obs\"}$ = 20"),
-  TeX("(12) $n_{\"obs\"}$ = 25 (REF)"),
+  # TeX("(12) $n_{\"obs\"}$ = 25 (REF)"),
+  TeX("(12) (REF)"),
   TeX("(13) $n_{\"obs\"}$ = 50"),
   TeX("(14) $n_{\"obs\"}$ = 100")
 )
 
-# scenar Label for exporting reults in Typst csv
+# scenar Label for exporting results in Typst csv
 scenarTypst <- data.frame(
   scenarLabel = levels(scenario.data$scenarLabel)
 )
 scenarTypst <- scenarTypst %>%
   mutate(scenarTypst = str_replace_all(
     scenarLabel,
-    c("break.sd" = "$sigma_psi$",
+    c("break.sd" = "$tau_psi$",
       "peak.duration.mean" = '$T_("peak")$',
       "score.sd.slopes" = "$sigma_epsilon$",
       "outlier.prob" = '$p_("out")$',
@@ -209,8 +212,47 @@ The first reported outcome are missing estimates counts and rates. We made a pri
 No missing estimates were produced.
 
 ```{r err-rate-scenar, echo=TRUE}
-all(is.na(estimates.11$error)) & all(is.na(estimates.10$error))
+# all(is.na(estimates.11$error)) & all(is.na(estimates.10$error))
+#
+
+all(is.na(estimates.10$error))
+
+err_lme <- estimates.lme %>% 
+  select(simID, error) %>% 
+  distinct() %>% 
+  left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>% 
+  left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+  distinct() %>%
+  group_by(scenarLabel) %>%
+  summarise(error.pct.lme = round(100*sum(!is.na(error))/n(), 2),
+            error.nb.lme = sum(!is.na(error)),
+            power.ok.lme = (error.pct.lme<=20))
+
+gt(err_lme %>% select(scenarLabel, starts_with("error.")), 
+   rowname_col = "scenarLabel") %>%
+  tab_caption("Error rates distribution for every DGM and methods") %>%
+  tab_stubhead(label = md("**DGM**")) %>%
+  cols_align(align = "left", columns = scenarLabel) %>%
+  tab_options(table.font.size = 12) %>%
+  opt_stylize(style = 1, color = "cyan") %>%
+  # tab_header(
+  #   title = "Missing estimates counts and rates",
+  #   subtitle = "Method `segmented.lme` - Distribution per DGM (n.sim=594)"
+  # ) %>%
+  tab_stubhead(label = "DGM") %>%
+  tab_spanner(label=md("**Mixed model**"), columns=ends_with(".lme")) %>%
+  tab_spanner(label=md("**Mixed 10 model**"), columns=ends_with(".segreg")) %>%
+  opt_row_striping(row_striping = TRUE) %>%
+  # add red highlight if error rate too high
+  tab_style(
+    style = cell_fill(color = "#FFD6D7"),
+    locations = cells_body(
+      columns = ends_with(".lme"),
+      rows = !err_lme$power.ok.lme)
+  )
 ```
+
++ COPY reasons from intermediate report
 
 
 <!-- =========================================================== -->
@@ -227,12 +269,13 @@ Before undertaking formal analysis of the performance measurements, graphical ex
 This graph aims at having an overview of the breakpoint estimates distribution, especially looking for outliers. The parameter of interest is $\hat\psi_d$, the breakpoint time-location, and was simulated following a truncated log-normal distribution, with mean $\psi=77$ minutes for every DGM.
 
 
-### Unconstrained model
+### Muggeo 11 model
 
 The distribution of the estimated breakpoints $\hat\psi_d$ for the reference scenario is plotted below:
 
 ```{r est-dist-11, warning=FALSE, fig.align='center', fig.cap="Estimated $\\hat{\\psi_d}$ distribution for the reference scenario"}
-dataset1 <- estimates.11 %>%
+names(estimates.lme)[3] <- "break.x1.avg"
+dataset1 <- estimates.lme %>%
   select(simID, break.x1.avg) %>%
   distinct() %>%
   left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>%
@@ -244,17 +287,19 @@ ggplot(dataset1 %>% filter(str_detect(scenarLabel, "REF")),
   geom_boxplot() +
   geom_density(aes(x = break.x1.avg), inherit.aes = FALSE) +
   geom_vline(xintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
-  labs(subtitle = TeX(
-    paste("True mean \\psi = 77 ; Mean of estimates \\bar{\\hat{\\psi}}=",
-          round(mean(dataset1$break.x1.avg[str_detect(dataset1$scenarLabel, "REF")],
-                     na.rm=T),1), "; Median(\\hat{\\psi}) =",
-          round(median(dataset1$break.x1.avg[str_detect(dataset1$scenarLabel,"REF")],
-                       na.rm=T),1)))) +
+  # labs(subtitle = TeX(
+  #   paste("True mean \\psi = 77 ; Mean of estimates \\bar{\\hat{\\psi}}=",
+  #         round(mean(dataset1$break.x1.avg[str_detect(dataset1$scenarLabel, "REF")],
+  #                    na.rm=T),1), "; Median(\\hat{\\psi}) =",
+  #         round(median(dataset1$break.x1.avg[str_detect(dataset1$scenarLabel,"REF")],
+  #                      na.rm=T),1)))) +
   xlab("Estimated breakpoint distribution (min)") +
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
-# ggsave("figs/dist-mixed-ref.png", width = 148, height = 105, units = "mm")
+
+# k = 1
+# ggsave("../../../figures/simStudy/10-11/gg-dist-11-REF.png", width = k*148, height = k*105, units = "mm")
 ```
 
 The distribution of estimated breakpoint is right-shifted compared to the true value $\psi=77$, with an estimated mean and median breakpoint around 78 minutes.
@@ -262,8 +307,8 @@ This quantifies to an average bias of ~1.2 minutes for this scenario.
 
 Most importantly, the scenario-wise distribution is the following:
 
-```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM (Unconstrained model) - orange line is target $\\psi=77$. One outlier sits a little over 150 min for DGM(2)"}
-dataset11.dgm <- estimates.11 %>%
+```{r est-dist-lme-dgm, warning=FALSE, fig.align='center', fig.cap="Distribution of breakpoint estimates $\\hat{\\psi_d}$ for all DGM (Muggeo 11 model) - orange line is target $\\psi=77$. One outlier sits a little over 150 min for DGM(2)"}
+dataset11.dgm <- estimates.lme %>%
   select(simID, break.x1.avg) %>%
   distinct() %>%
   left_join(true.parameters[, c("simID", "scenarID")], by="simID") %>%
@@ -271,7 +316,7 @@ dataset11.dgm <- estimates.11 %>%
   distinct()
 
 # boxplot
-ylim.dist <- c(60, 110)
+ylim.dist <- c(40, 100)
 ggplot(dataset11.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   # ylim(25, 100) +
   geom_boxplot() +
@@ -282,10 +327,12 @@ ggplot(dataset11.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   ylim(ylim.dist) +
   ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
   xlab("(scenario.nb) parameter varying from reference")
-# ggsave("figs/dist-mixed-all.png", width = 148, height = 105, units = "mm")
+
+# k = 1
+# ggsave("../../../figures/simStudy/10-11/gg-dist-11-all.png", width = k*148, height = k*105, units = "mm")
 ```
 
-The labels on the _y_-axis corresponds to the parameter varying with all of the others being of the reference "cased-base" (scenario 7).
+The labels on the _y_-axis corresponds to the parameter varying with all of the others being of the reference "cased-base" (scenario 12).
 
 This panel reflects that the overestimation of the breakpoint distribution is dispatched among every DGM. Normality empirically looks like a reasonable assumption for the distribution of the breakpoint estimate. It is good to remind here that the breakpoints were simulated following a log-normal distribution.
 
@@ -295,33 +342,34 @@ One exceptional outlier occurred with an estimated breakpoint over $150$ minutes
 
 This model is miss-specified in comparison to the simulated data, given that it has an additional degree of freedom on the second phase slope, which distributions are displayed below:
 
-```{r slope2, warning=FALSE, fig.align='center', fig.cap="Distribution of second-segment slope ($\\beta_2 = \\beta_1 + \\delta_2$) for all DGM (Unconstrained model)"}
-ggplot(estimates.11 %>%
-         left_join(true.parameters[, c("simID", "scenarID")] %>% 
-                     distinct(), by="simID") %>%
-         left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
-         group_by(simID) %>% 
-         summarise(slope2 = mean(slope2),
-                   scenarLabel = first(scenarLabel)),
-  aes(x=scenarLabel, y=slope2)) +
-  geom_boxplot() +
-  coord_flip() +
-  scale_x_discrete(labels = latex_labels) +
-  geom_hline(yintercept = 0, linetype="dashed", color = "orange2") +
-  ylab("Second-phase slope value (SDI/time)") +
-  xlab("Data-Generating Mechanism")
-# ggsave("figs/dist-mixed-slope2.png", width = 148, height = 105, units = "mm")
-
-estimates.11 %>% 
-  select(simID, starts_with("slope2")) %>% 
-  distinct() %>% 
-  mutate(
-    slope2.low = slope2 + qnorm(0.025)*slope2.sd, 
-    slope2.up = slope2 - qnorm(0.025)*slope2.sd, 
-    slope.signif = (slope2.up > 0) & (0 > slope2.low)
-  ) %>% 
-  select(slope.signif) %>%
-  summary()
+```{r slope2, warning=FALSE, fig.align='center', fig.cap="Distribution of second-segment slope ($\\beta_2 = \\beta_1 + \\delta_2$) for all DGM (Muggeo 11 model)"}
+# NOT included in original sim study report (in mixedBreak 11 / 10 yes)
+# ggplot(estimates.lme %>%
+#          left_join(true.parameters[, c("simID", "scenarID")] %>%
+#                      distinct(), by="simID") %>%
+#          left_join(scenario.data[, c("scenarID", "scenarLabel")], by="scenarID") %>%
+#          group_by(simID) %>%
+#          summarise(slope2 = mean(slope2),
+#                    scenarLabel = first(scenarLabel)),
+#   aes(x=scenarLabel, y=slope2)) +
+#   geom_boxplot() +
+#   coord_flip() +
+#   scale_x_discrete(labels = latex_labels) +
+#   geom_hline(yintercept = 0, linetype="dashed", color = "orange2") +
+#   ylab("Second-phase slope value (SDI/time)") +
+#   xlab("Data-Generating Mechanism")
+# # ggsave("figs/dist-mixed-slope2.png", width = 148, height = 105, units = "mm")
+# 
+# estimates.lme %>%
+#   select(simID, starts_with("slope2")) %>%
+#   distinct() %>%
+#   mutate(
+#     slope2.low = slope2 + qnorm(0.025)*slope2.sd,
+#     slope2.up = slope2 - qnorm(0.025)*slope2.sd,
+#     slope.signif = (slope2.up > 0) & (0 > slope2.low)
+#   ) %>%
+#   select(slope.signif) %>%
+#   summary()
 ```
 
 Overall, the distributions of second phase slope are close to 0 in magnitude: for all DGM, 50% of estimated values are contained within $[\pm0.05]$. At the more extreme, we find $8$ values of second phase slope such that $|\beta_{2}| > 0.02$. 
@@ -341,6 +389,23 @@ dataset10.dgm <- estimates.10 %>%
   left_join(scenario.data %>% select(starts_with("scenar")), by="scenarID") %>%
   distinct()
 
+# grouped boxplot
+ggplot(rbind(dataset10.dgm %>% mutate(method = "Proposed Mixed 10"),
+             dataset11.dgm %>% mutate(method = "Muggeo Mixed 11")),
+       aes(x = scenarLabel, y = break.x1.avg, fill = method)) +
+  geom_boxplot() + # aes(color = method) # instead of fill = method
+  geom_hline(yintercept = TRUE.PSI, colour = "orange2", linetype = "dashed") +
+  coord_flip() +
+  scale_x_discrete(labels = latex_labels) +
+  ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
+  ylim(ylim.dist) +
+  xlab("(scenario.nb) parameter varying from reference") +
+  theme(legend.position = "top")
+
+k <- 1.5
+ggsave("../../../figures/simStudy/10-11/gg-dist-all.png", width = k*148, height = k*105, units = "mm")
+
+
 # boxplot
 ggplot(dataset10.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   geom_boxplot() +
@@ -350,8 +415,13 @@ ggplot(dataset10.dgm, aes(x = scenarLabel, y = break.x1.avg)) +
   ylab(TeX("Breakpoint estimates $\\hat{\\psi_{d}}$ distribution")) +
   ylim(ylim.dist) +
   xlab("(scenario.nb) parameter varying from reference")
-# ggsave("figs/dist-plateau-all.png", width = 148, height = 105, units = "mm")
+# ggsave("../../../figures/simStudy/10-11/gg-dist-10-all.png", width = 148, height = 105, units = "mm")
 ```
+
+NEW: 
+- Both biased (11 under, 10 over)
+- Dispersion less important in 10
+- DGM Factor appears to affect the quality of the estimation is the same direction for both methods ? y/n
 
 The overall distribution also appears to overestimate the breakpoint for the plateau model.
 
@@ -367,7 +437,7 @@ The estimated breakpoint $\psi$ is represented on both axis, each axis correspon
 dataset2 <- estimates.10 %>%
   select(simID, break.x1.avg) %>%
   distinct() %>%
-  left_join(estimates.11 %>%
+  left_join(estimates.lme %>%
               select(simID, break.x1.avg) %>%
               distinct(), by = "simID") %>%
   left_join(true.parameters %>% select(simID, scenarID) %>% distinct(), by="simID") %>%
@@ -377,13 +447,15 @@ ggplot(dataset2 %>% filter(str_detect(scenarLabel, "REF")),
        aes(x=break.x1.avg.x, y=break.x1.avg.y)) +
   geom_point(alpha=.5) +
   geom_abline(slope=1, lty = "dashed", colour="orange2") +
-  labs(title=TeX("Bivariate plot of $\\hat{\\psi_d}$ for the reference scenario"),
-       subtitle = paste("Dashed line is y = x ; Correlation is",
-                        round(cor(dataset2 %>% filter(str_detect(scenarLabel, "REF")) %>%
-                                    select(starts_with("break.x1.avg")),
-                                  use = "na.or.complete"), 2)[1,2])) +
-  xlab(TeX("Estimated $\\hat{\\psi_d}$ for Plateau model")) +
-  ylab(TeX("Estimated $\\hat{\\psi_d}$ for Unconstrained model"))
+  # labs(title=TeX("Bivariate plot of $\\hat{\\psi_d}$ for the reference scenario"),
+  #      subtitle = paste("Dashed line is y = x ; Correlation is",
+  #                       round(cor(dataset2 %>% filter(str_detect(scenarLabel, "REF")) %>%
+  #                                   select(starts_with("break.x1.avg")),
+  #                                 use = "na.or.complete"), 2)[1,2])) +
+  xlab(TeX("Estimated $\\hat{\\psi_d}$ for Mixed 10 model")) +
+  ylab(TeX("Estimated $\\hat{\\psi_d}$ for Muggeo 11 model"))
+
+# ggsave("../../../figures/simStudy/10-11/gg-biv-REF.png", width = 148, height = 105, units = "mm")
 
 cor.test(
   dataset2$break.x1.avg.x[str_detect(dataset2$scenarLabel, "REF")],
@@ -412,7 +484,8 @@ facet_mapping <- list(
   "(9) n.obs = 10" = TeX("(9) $n_{\\text{obs}} = 10$"),
   "(10) n.obs = 15" = TeX("(10) $n_{\\text{obs}} = 15$"),
   "(11) n.obs = 20" = TeX("(11) $n_{\\text{obs}} = 20$"),
-  "(12) n.obs = 25 (REF)" = TeX("(12) $n_{\\text{obs}} = 25$ (REF)"),
+  # "(12) n.obs = 25 (REF)" = TeX("(12) $n_{\\text{obs}} = 25$ (REF)"),
+  "(12) (REF)" = TeX("(12) $n_{\\text{obs}} = 25$ (REF)"),
   "(13) n.obs = 50" = TeX("(13) $n_{\\text{obs}} = 50$"),
   "(14) n.obs = 100" = TeX("(14) $n_{\\text{obs}} = 100$")
 )
@@ -423,9 +496,12 @@ ggplot(dataset2.dgm, aes(x = break.x1.avg.x, y = break.x1.avg.y)) +
              labeller = as_labeller(facet_mapping)) +
   geom_smooth(method = lm, formula = y~x) +
   geom_abline(slope=1, lty = "dashed", colour="orange2") +
-  xlab(TeX("Estimated $\\hat{\\psi_d}$ for Plateau model")) +
-  ylab(TeX("Estimated $\\hat{\\psi_d}$ for Unconstrained model")) +
+  xlab(TeX("Estimated $\\hat{\\psi_d}$ for Mixed 10 model")) +
+  ylab(TeX("Estimated $\\hat{\\psi_d}$ for Muggeo 11 model")) +
   ylim(NA, 110)
+
+# k <- 1.5
+# ggsave("../../../figures/simStudy/10-11/gg-biv-all.png", width = k*148, height = k*105, units = "mm")
 
 dataset2.dgm %>% select(scenarLabel, rho) %>% distinct() %>% arrange(desc(rho))
 ```
@@ -437,28 +513,28 @@ Overall, the correlation in the breakpoint estimate between the two methods is h
 Additionally, we plot below the same graph between the unconstrained model and the same model in another implementation (package `segmented`, function `segmented.lme`):
 
 ```{r biv-plot-dgm-muggeo, fig.width=10, warning=FALSE, fig.align='center', fig.cap="Bivariate plot of breakpoint estimates $\\hat{\\psi_d}$ from both methods, for all DGM"}
-dataset2.dgm <- dataset2.dgm %>%
-  left_join(estimates.lme %>%
-              select(simID, break.avg) %>%
-              distinct(), by = "simID") %>%
-  mutate(rho.muggeo = cor(break.avg, break.x1.avg.y, use = "na.or.complete"))
-
-
-ggplot(dataset2.dgm, aes(x = break.avg, y = break.x1.avg.y)) +
-  geom_point(alpha = 0.5) +
-  facet_wrap(~ scenarLabel,
-             labeller = as_labeller(facet_mapping)) +
-  geom_smooth(method = lm, formula = y~x) +
-  geom_abline(slope=1, lty = "dashed", colour="orange2") +
-  ylim(NA, 110) +
-  xlab(TeX("Estimated $\\hat{\\psi_d}$ for `segmented.lme`")) +
-  ylab(TeX("Estimated $\\hat{\\psi_d}$ for `mixed.break1`"))
-  
-
-dataset2.dgm %>% 
-  select(scenarLabel, rho.muggeo) %>% 
-  distinct() %>% 
-  arrange(desc(rho.muggeo))
+# dataset2.dgm <- dataset2.dgm %>%
+#   left_join(estimates.lme %>%
+#               select(simID, break.avg) %>%
+#               distinct(), by = "simID") %>%
+#   mutate(rho.muggeo = cor(break.avg, break.x1.avg.y, use = "na.or.complete"))
+# 
+# 
+# ggplot(dataset2.dgm, aes(x = break.avg, y = break.x1.avg.y)) +
+#   geom_point(alpha = 0.5) +
+#   facet_wrap(~ scenarLabel,
+#              labeller = as_labeller(facet_mapping)) +
+#   geom_smooth(method = lm, formula = y~x) +
+#   geom_abline(slope=1, lty = "dashed", colour="orange2") +
+#   ylim(NA, 110) +
+#   xlab(TeX("Estimated $\\hat{\\psi_d}$ for `segmented.lme`")) +
+#   ylab(TeX("Estimated $\\hat{\\psi_d}$ for `mixed.break1`"))
+#   
+# 
+# dataset2.dgm %>% 
+#   select(scenarLabel, rho.muggeo) %>% 
+#   distinct() %>% 
+#   arrange(desc(rho.muggeo))
 ```
 
 The correlation is very low for two methods who are supposed to rely on the same theoretical algorithm. The range is $[53\%-83\%]$ across DGM. It also appears dependent on the DGM, which highlights intrinsic differences between the methods.
@@ -481,27 +557,33 @@ Under or over coverage typically arises in one of three situations:
 ### Unconstrained model
 
 ```{r zip-plot-11, fig.width=10, fig.height=6, warning=FALSE, fig.align='center', fig.cap="Zip plot for breakpoint estimates $\\hat{\\psi_d}$ (Unconstrained model)"}
-zip.11 <- estimates.11 %>% 
+# NEW
+estimates.lme <- estimates.lme[, c(1:3, 5, 4, 6:10)]
+names(estimates.lme) <- names(estimates.10)
+
+
+zip.lme <- estimates.lme %>% 
   select(simID, starts_with("break.")) %>%
   mutate(method = "11")
 zip.10 <- estimates.10 %>% 
   select(simID, starts_with("break.")) %>%
   mutate(method = "10")
 
+
 # dataset with z.score for zip plots
-dataset <- zip.10 %>%
-  rbind(zip.11) %>%
-  mutate(method = as.factor(if_else(method=="11", "Unconstrained", "Plateau"))) %>%
+dataset <- rbind(zip.lme, zip.10) %>%
+  mutate(method = as.factor(if_else(method=="11", "Muggeo_11", "Mixed_10"))) %>%
   left_join(true.parameters %>% select(simID, scenarID) %>% distinct(),
             by = "simID") %>%
   left_join(scenario.data %>% select(scenarID, scenarLabel), by= "scenarID") %>%
   # filter(!is.na(break.x1.avg)) %>% # no NA's in dataset
   group_by(scenarLabel, method) %>%
   mutate(z.score = (break.x1.avg - TRUE.PSI)/break.x1.sd,
-         z.rank = rank(abs(z.score), na.last = "keep")/n(),
+         z.rank = rank(abs(z.score), na.last = "keep")/sum(!is.na(break.x1.avg)),
          contains = TRUE.PSI > break.CI95.low & TRUE.PSI < break.CI95.up)
 
-p <- ggplot(dataset %>% filter(method=="Unconstrained" & !is.na(contains)),
+#  & scenarLabel == "(12) n.obs = 25 (REF)"
+p <- ggplot(dataset %>% filter(method=="Muggeo_11" & !is.na(contains)),
        aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up,
            colour = contains)) +
   geom_segment() +
@@ -516,7 +598,7 @@ p <- ggplot(dataset %>% filter(method=="Unconstrained" & !is.na(contains)),
 
 simsum.11 <- simsum(
   dataset %>% 
-    filter(method=="Unconstrained") %>% 
+    filter(method=="Muggeo_11") %>% 
     select(-ends_with(".ind")) %>% 
     distinct(),
   estvarname = "break.x1.avg",
@@ -538,6 +620,15 @@ p +
              linetype = "dashed", linewidth = 0.5, colour = "yellow") +
   geom_hline(data = cover.conf.int.11, aes(yintercept = cover.95.up),
              linetype = "dashed", linewidth = 0.5, colour = "yellow")
+# p +
+#   geom_hline(yintercept = cover.conf.int.11$cover.95.low[12],
+#              linetype = "dashed", linewidth = 0.5, colour = "yellow") +
+#   geom_hline(yintercept = cover.conf.int.11$cover.95.up[12],
+#              linetype = "dashed", linewidth = 0.5, colour = "yellow")
+
+# k <- 1.5
+# ggsave("../../../figures/simStudy/10-11/gg-zip-11-REF.png", width = k*148, height = k*105, units = "mm")
+
 
 cover.conf.int.11 %>% 
   arrange(desc(est)) %>% 
@@ -553,21 +644,22 @@ It is likely that two ingredients of the confidence interval (bias and model SE)
 
 
 ```{r zip-plot-10, fig.width=10, fig.height=6, warning=FALSE, fig.align='center', fig.cap="Zip plot for breakpoint estimates $\\hat{\\psi_d}$ (Plateau model)"}
-p <- ggplot(dataset %>% filter(method=="Plateau" & !is.na(contains)),
+# 
+p <- ggplot(dataset %>% filter(method=="Mixed_10" & scenarLabel == "(12) n.obs = 25 (REF)" & !is.na(contains)),
        aes(y = z.rank, x = break.CI95.low, xend = break.CI95.up, 
            colour = contains)) +
   geom_segment() +
-  facet_wrap(~scenarLabel) +
+  # facet_wrap(~scenarLabel) +
   geom_vline(xintercept = TRUE.PSI, linetype = "dashed") +
   geom_hline(yintercept = 0.95, linetype = "dashed") +
   # labs(title = "Zip plot for method Plateau model for every DGM", colour = "") +
   xlab("95% confidence intervals") +
   ylab("Fractional centiles of |z-score|") +
   scale_colour_hue(labels = c("Non-coverers", "Coverers", NA)) +
-  theme(legend.position = "bottom")
+  theme(legend.position = "none")
 
 simsum.10 <- simsum(
-  dataset %>% filter(method=="Plateau"),
+  dataset %>% filter(method=="Mixed_10"),
   estvarname = "break.x1.avg",
   se = "break.x1.sd",
   true = TRUE.PSI, # true value of estimated parameter
@@ -584,10 +676,17 @@ cover.conf.int.10 <- simsum.10$summ %>%
 
 p +
   geom_hline(data = cover.conf.int.10, aes(yintercept = cover.95.low),
-             linetype = "dashed", linewidth = 1.2, colour = "yellow") +
+             linetype = "dashed", linewidth = 0.5, colour = "yellow") +
   geom_hline(data = cover.conf.int.10, aes(yintercept = cover.95.up),
-             linetype = "dashed", linewidth = 1.2, colour = "yellow")
-# ggsave("figs/zip-plateau-all.png", width = 2*148, height = 2*105, units = "mm")
+             linetype = "dashed", linewidth = 0.5, colour = "yellow")
+# p +
+#   geom_hline(yintercept = cover.conf.int.10$cover.95.low[12],
+#              linetype = "dashed", linewidth = 0.5, colour = "yellow") +
+#   geom_hline(yintercept = cover.conf.int.10$cover.95.up[12],
+#              linetype = "dashed", linewidth = 0.5, colour = "yellow")
+
+# k <- 1
+# ggsave("../../../figures/simStudy/10-11/gg-zip-10-REF.png", width = k*148, height = k*105, units = "mm")
 
 cover.conf.int.10 %>%
   arrange(desc(est)) %>%
@@ -608,20 +707,25 @@ Again, the breakpoint SE might be underestimated here. We will see in the metric
 # Performance measurements and Monte Carlo Standard Errors
 
 ```{r metrics-dataset}
+# NEW:
+metrics.df <- dataset %>% 
+  select(scenarLabel, simID, break.x1.avg, break.x1.sd, starts_with("break.CI"), method) %>%
+  distinct()
+
 metrics <- simsum(
-  dataset %>% 
-    select(scenarLabel, break.x1.avg, break.x1.sd, starts_with("break.CI"), method) %>%
-    distinct(),
+  metrics.df,
   estvarname = "break.x1.avg",
   se = "break.x1.sd",
   true = TRUE.PSI, # true value of estimated parameter
   methodvar = "method", # variable containing the methods to compare
-  ref = "Plateau",
+  ref = "Mixed_10",
   by = "scenarLabel", # factor of data-generating mechanism
   ci.limits = c("break.CI95.low", "break.CI95.up"),
   x = TRUE, # necessary for zip plots
   control = list(mcse = TRUE)
 )
+
+# error due to presence of NA collapsing into a single line
 
 # every metrics in summary
 summ <- summary(
@@ -654,33 +758,33 @@ formatted.res <- summ$summ %>%
   arrange(scenarOrder) %>%
   left_join(scenario.data %>% select(scenarID, scenarLabel), by = join_by(scenarLabel)) %>%
   # select(-c("lower", "upper")) %>%
-  filter(stat %in% c("bias", "cover", "becover")) %>% # , "empse", "modelse"
+  filter(stat %in% c("bias", "empse", "modelse", "cover")) %>% #, "becover" 
   pivot_wider(names_from = method, values_from = c(est:mcse, lower:upper)) %>%
   arrange(scenarOrder, stat) %>%
   rename(
-    lower.11 = lower_Unconstrained,
-    upper.11 = upper_Unconstrained,
-    lower.10 = lower_Plateau,
-    upper.10 = upper_Plateau) %>%
+    lower.11 = lower_Muggeo_11,
+    upper.11 = upper_Muggeo_11,
+    lower.10 = lower_Mixed_10,
+    upper.10 = upper_Mixed_10) %>%
   mutate(
     round.11 = 2L, #-floor(log10(abs(mcse_segmented.lme))),
     # 0-padding + rounding
-    # mod.11 = paste0(round(est_Unconstrained, round.11), " (",
-    #                        round(mcse_Unconstrained, round.11), ")"),
+    # mod.11 = paste0(round(est_Muggeo_11, round.11), " (",
+    #                        round(mcse_Muggeo_11, round.11), ")"),
     mod.11 = if_else(
-      mcse_Unconstrained < 10^(-round.11), # mystery -1L on the rounding...
-      paste0(format(est_Unconstrained, digits = round.11-1L), " (<", 10^(-round.11), ")"),
+      mcse_Muggeo_11 < 10^(-round.11), 
+      paste0(format(est_Muggeo_11, digits = round.11), " (<", 10^(-round.11), ")"),
       paste0(
-        format(est_Unconstrained, digits = round.11-1L), " (",
-        format(round(mcse_Unconstrained, round.11)), ")"
+        format(est_Muggeo_11, digits = round.11), " (",
+        format(round(mcse_Muggeo_11, round.11)), ")"
       )),
     round.10 = 2L, # -floor(log10(abs(mcse_10))),
     mod.10 = if_else(
-      mcse_Plateau < 10^(-round.10),
-      paste0(format(round(est_Plateau, round.10)), " (<", 10^(-round.10), ")"),
+      mcse_Mixed_10 < 10^(-round.10),
+      paste0(format(round(est_Mixed_10, round.10)), " (<", 10^(-round.10), ")"),
       paste0(
-        format(round(est_Plateau, round.10), digits = round.10), " (",
-        format(round(mcse_Plateau, round.10)), ")"
+        format(round(est_Mixed_10, round.10), digits = round.10), " (",
+        format(round(mcse_Mixed_10, round.10)), ")"
       )),
     bias_10.target = (lower.10 < 0) & (0 < upper.10),
     cover_10.target = (lower.10 < 1-typeIerr) & (1-typeIerr < upper.10),
@@ -688,25 +792,27 @@ formatted.res <- summ$summ %>%
     cover_11.target = (lower.11 < 1-typeIerr) & (1-typeIerr < upper.11)
   )
 
+# TODO - add signifiance of perf target
+# CHECK - below, all perf-measure are significant
 
 # printing the table of performance measurements
 formatted.res %>%
   select(stat, scenarLabel, starts_with("mod.")) %>%
   pivot_wider(names_from = stat, values_from = c("mod.11", "mod.10")) %>%
-  relocate(mod.11_bias, mod.11_empse, mod.11_modelse, mod.11_cover) %>% # order columns
+  relocate(mod.11_bias, mod.11_cover) %>% # order columns , mod.11_empse, mod.11_modelse
   gt(
     rowname_col = "scenarLabel",
     row_group_as_column = TRUE
   ) %>%
-  tab_caption("Performance measurements (MCSE) for all DGM and methods") %>%
+  # tab_caption("Performance measurements (MCSE) for all DGM and methods") %>%
   tab_header(title = "Performance measurements per method and DGM (MCSE in parenthesis)") %>%
   tab_stubhead(label = md("**DGM**")) %>%
   cols_align(align = "left", columns = scenarLabel) %>%
   tab_spanner(label=md("**Bias**"), columns=ends_with("_bias")) %>%
-  # tab_spanner(label=md("**Empirical SE**"), columns=ends_with("_empse")) %>%
-  # tab_spanner(label=md("**Model SE**"), columns=ends_with("_modelse")) %>%
+  tab_spanner(label=md("**Empirical SE**"), columns=ends_with("_empse")) %>%
+  tab_spanner(label=md("**Model SE**"), columns=ends_with("_modelse")) %>%
   tab_spanner(label=md("**Coverage**"), columns=ends_with("_cover")) %>%
-  tab_spanner(label=md("**Bias-Eliminated Coverage**"), columns=ends_with("_becover")) %>%
+  # tab_spanner(label=md("**Bias-Eliminated Coverage**"), columns=ends_with("_becover")) %>%
   tab_options(table.font.size = 12) %>%
   opt_stylize(style = 1, color = "cyan") %>%
   # conditional formatting on bias/coverage significance w\ respect to target (0 / .95) ?
@@ -737,16 +843,18 @@ formatted.res %>%
       rows = formatted.res$cover_10.target[formatted.res$stat=="cover"] )
   )
 
-# # EXPORT
+# PROBLEM WITH MODSE BECAUSE IT IS ON LOGIT SCALE
+# => need to transform using MC simulation 
+# also why does empSE has 2 columns ? since the true param are the same it must be identical ??
+
+# EXPORT
 # formatted.res %>%
 #   select(stat, scenarLabel, starts_with("mod.")) %>%
 #   pivot_wider(names_from = stat, values_from = starts_with("mod.")) %>%
 #   left_join(scenarTypst, by=join_by(scenarLabel)) %>%
-#   select(scenarTypst, ends_with("_bias"), ends_with("_empse"),
-#          ends_with("_modelse"), ends_with("_cover")) %>%
-#   relocate(scenarTypst, ends_with("_bias"), ends_with("_cover"),
-#            ends_with("_empse"), ends_with("_modelse"))
-#   write.csv(file = "tbls/perf-mcse-mixedBreak.csv", row.names = FALSE)
+#   select(scenarTypst, ends_with("_bias"), ends_with("_cover"), ends_with("_empse"), ends_with("_modelse")) %>% # 
+#   relocate(scenarTypst, ends_with("_bias"), ends_with("_cover")) #%>%
+#   # write.csv(file = "../../../figures/simStudy/10-11/perf-mcse-10-11.csv", row.names = FALSE)
 ```
 
 <center>

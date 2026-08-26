@@ -42,7 +42,8 @@ summary.mixedBreak <- function(z, default = FALSE){
   fixed <- z$fixed
   fixed[stringr::str_detect(rownames(fixed), "break"), "t value"] <- NA
   print(fixed)
-  cat(" psi.link = logit\n")
+  cat(" psi.link = logit, psi.range = c(", paste(z$psi.range, collapse = ", "), 
+      ")\n")
   
   # browser()
   n.obs <- x@devcomp$dims[["N"]]

@@ -62,12 +62,9 @@ mixed.break <- function(
   # just have to be careful with breakpoint order when plotting
   
   n.psi <- nchar(pattern) - 1L
-  if( (length(psi.range) != n.psi & !all(is.na(psi.range))) | 
+  if( (length(psi.range) != 2 & !all(is.na(psi.range))) | 
       (any(is.na(psi.range)) & length(psi.range) > 1L) ) {
-    stop(paste(
-      "When specified, `psi.range` must be (non-NA) numeric and same size as number of",
-      "breakpoints (", n.psi, ").")
-    )
+    stop("When specified, `psi.range` must be (non-NA) numeric and size (2)")
   }
   
   if(!(approx %in% c("Muggeo.LMM", "Muggeo.LM", "Muggeo.less")))
