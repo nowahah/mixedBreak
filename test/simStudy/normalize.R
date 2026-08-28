@@ -59,17 +59,23 @@ normalize.mlmbreak <- function(x){
 
 ## method for object of class 'mixedBreak'
 normalize.mixedBreak <- function(x){
+  # browser()
   summ <- summary(x$lme.fit)
   n.coef <- length(x$lme.fit@beta)
-  a <- x$range.psi
+  a <- x$psi.range
   expit <- function(bp) { return((a[1]+a[2]*exp(bp)) / (1+exp(bp))) }
+  d.expit <- function(bp) { return( exp(bp)*diff(a) / (1+exp(bp))^2 ) }
+  break.x1.sd <- summ$coefficients[n.coef, "Std. Error"] * d.expit(summ$coefficients[n.coef, "Estimate"])
+  M <- 1e4
+  eta.rd.sample <- rnorm(M, x$lme.fit@beta[length(x$lme.fit@beta)], attr(lme4::VarCorr(x$lme.fit)$ID, "stddev")['G1'])
+  break.x1.random.sd <- sd(expit(eta.rd.sample))
   res <- list(
     break.x1.avg = expit(x$lme.fit@beta[length(x$lme.fit@beta)]),
     break.x1.ind = x$psi.i,
-    break.x1.sd = summary(x$lme.fit)$coefficients[n.coef, "Std. Error"],
-    break.x1.random.sd = unname(attr(lme4::VarCorr(x$lme.fit)$ID, "stddev")['G1']),
-    break.CI95.low = expit(confint(x)[1, n.coef]),
-    break.CI95.up = expit(confint(x)[2, n.coef]),
+    break.x1.sd = break.x1.sd,
+    break.x1.random.sd = break.x1.random.sd,
+    break.CI95.low = confint(x)[1, n.coef],
+    break.CI95.up = confint(x)[2, n.coef],
     break.y1.ind = x$psi.i * x$random[[1]], 
     slope2 = ifelse(x$pattern == "11", sum(x$fixed[1:2, 1]), 0),
     slope2.sd = ifelse(x$pattern == "11", sum(x$fixed[1:2, 2])+ 2*summ$varcor$ID[1,2], NA)

@@ -28,8 +28,8 @@ tbl <- model.tables(e.XPall)
 tbl %>% 
   tidyr::pivot_wider(id_from = "id", values_from = c("time", "intercept"))
 plot(e.XPall)
-ggsave("../../figures/basel/lmbreak-1010-noSPS.png",
-       width = 4*148, height = 4*105, units = "mm")
+# ggsave("../../figures/basel/lmbreak-1010-noSPS.png",
+#        width = 4*148, height = 4*105, units = "mm")
 
 breakpoints <- tbl[rep((1:15-1)*4,each=3)+2:4, 2]
 breakpoints <- matrix(breakpoints, ncol = 3, byrow = T) # breakpoints
